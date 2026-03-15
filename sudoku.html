@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数独游戏</title>
+    <link rel="stylesheet" href="sudoku.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>数独</h1>
+        </header>
+
+        <div class="game-info">
+            <div class="info-box">
+                <span class="info-label">难度</span>
+                <span class="info-value" id="difficulty-display">简单</span>
+            </div>
+            <button class="new-game-btn" id="new-game-btn">新游戏</button>
+            <div class="info-box">
+                <span class="info-label">用时</span>
+                <span class="info-value" id="timer">00:00</span>
+            </div>
+        </div>
+
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">简单</button>
+            <button class="difficulty-btn" data-difficulty="medium">中等</button>
+            <button class="difficulty-btn" data-difficulty="hard">困难</button>
+        </div>
+
+        <div class="game-board" id="game-board"></div>
+
+        <div class="number-pad" id="number-pad">
+            <button class="num-btn" data-num="1">1</button>
+            <button class="num-btn" data-num="2">2</button>
+            <button class="num-btn" data-num="3">3</button>
+            <button class="num-btn" data-num="4">4</button>
+            <button class="num-btn" data-num="5">5</button>
+            <button class="num-btn" data-num="6">6</button>
+            <button class="num-btn" data-num="7">7</button>
+            <button class="num-btn" data-num="8">8</button>
+            <button class="num-btn" data-num="9">9</button>
+            <button class="num-btn erase-btn" data-num="0">擦除</button>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" id="hint-btn">💡 提示</button>
+            <button class="control-btn" id="check-btn">✓ 检查</button>
+        </div>
+
+        <div class="instructions">
+            <p><strong>游戏规则：</strong>填入1-9的数字，使每行、每列和每个3×3宫格内的数字不重复。</p>
+        </div>
+
+        <div class="game-message" id="game-message">
+            <p></p>
+            <button class="retry-btn">再试一次</button>
+        </div>
+    </div>
+
+    <script src="sudoku.js"></script>
+</body>
+</html>

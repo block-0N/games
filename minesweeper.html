@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷游戏</title>
+    <link rel="stylesheet" href="./minesweeper.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>扫雷</h1>
+        </header>
+
+        <div class="game-info">
+            <div class="info-box">
+                <span class="info-label">剩余雷数</span>
+                <span class="info-value" id="mines-count">10</span>
+            </div>
+            <button class="reset-btn" id="reset-btn">😊</button>
+            <div class="info-box">
+                <span class="info-label">时间</span>
+                <span class="info-value" id="timer">000</span>
+            </div>
+        </div>
+
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">简单</button>
+            <button class="difficulty-btn" data-difficulty="medium">中等</button>
+            <button class="difficulty-btn" data-difficulty="hard">困难</button>
+        </div>
+
+        <div class="game-board-wrapper">
+            <div class="game-board" id="game-board"></div>
+        </div>
+
+        <div class="instructions">
+            <p><strong>游戏规则：</strong>左键点击揭开格子，右键点击标记地雷。找出所有非雷格子即为胜利！</p>
+        </div>
+
+        <div class="game-message" id="game-message">
+            <p></p>
+            <button class="retry-btn">再试一次</button>
+        </div>
+    </div>
+
+    <script src="./minesweeper.js"></script>
+</body>
+</html>

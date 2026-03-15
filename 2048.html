@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 游戏</title>
+    <link rel="stylesheet" href="2048.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>2048</h1>
+            <div class="scores-container">
+                <div class="score-box">
+                    <span class="score-label">分数</span>
+                    <span class="score" id="score">0</span>
+                </div>
+                <div class="score-box">
+                    <span class="score-label">最高分</span>
+                    <span class="score" id="best-score">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-controls">
+            <button class="new-game-btn" id="new-game-btn">新游戏</button>
+        </div>
+
+        <div class="game-message" id="game-message">
+            <p></p>
+            <button class="retry-btn">再试一次</button>
+        </div>
+
+        <div class="game-container">
+            <div class="grid-container">
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+            </div>
+            <div class="tile-container" id="tile-container"></div>
+        </div>
+
+        <div class="instructions">
+            <p><strong>游戏规则：</strong>使用方向键移动方块，相同数字的方块会合并。目标是合成2048！</p>
+        </div>
+    </div>
+
+    <script src="2048.js"></script>
+</body>
+</html>

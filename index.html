@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <!-- SEO核心标签 - 关键优化点 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 核心SEO标签 -->
+    <title>小游戏中心 - 精选10款免费在线小游戏，即点即玩</title>
+    <meta name="description" content="小游戏中心提供10款精选免费在线小游戏，无需下载，即点即玩，包含休闲、益智等多种趣味小游戏，适合各年龄段玩家。">
+    <meta name="keywords" content="小游戏,在线小游戏,免费小游戏,休闲小游戏,益智小游戏,小游戏中心">
+    <meta name="author" content="小游戏中心">
+    <meta name="robots" content="index, follow">
+    <!-- Open Graph标签 - 社交分享优化 -->
+    <meta property="og:title" content="小游戏中心 - 精选10款免费在线小游戏">
+    <meta property="og:description" content="无需下载，即点即玩，10款精选小游戏等你来体验！">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://block-0n.github.io/games"> <!-- 替换为实际域名 -->
+    <meta property="og:image" content="./games.jpeg"> <!-- 替换为封面图 -->
+
+    <!-- 引入资源 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <!-- 自定义主题 - 增强色彩设计 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // 主色调：活力蓝（更有层次感）
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        // 辅助色：提升视觉层次
+                        accent: {
+                            400: '#f97316', // 活力橙
+                            500: '#ef4444', // 醒目红
+                        },
+                        neutral: {
+                            50: '#fafafa',
+                            100: '#f5f5f5',
+                            200: '#e5e5e5',
+                            800: '#262626',
+                            900: '#171717',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['PingFang SC', 'Helvetica Neue', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .game-item {
+                @apply bg-white rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border border-neutral-200 hover:border-primary-100;
+            }
+            .game-item:nth-child(5n+1) { --card-color: #3b82f6; }
+            .game-item:nth-child(5n+2) { --card-color: #f97316; }
+            .game-item:nth-child(5n+3) { --card-color: #ef4444; }
+            .game-item:nth-child(5n+4) { --card-color: #8b5cf6; }
+            .game-item:nth-child(5n+5) { --card-color: #10b981; }
+            .game-item:hover {
+                box-shadow: 0 8px 24px -4px rgba(var(--card-color-rgb), 0.1);
+                border-color: var(--card-color);
+            }
+            .game-name {
+                @apply font-medium text-neutral-800 relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-current after:transition-all after:duration-300 hover:after:w-full;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-neutral-50 text-neutral-800 min-h-screen">
+    <!-- 顶部导航 - SEO优化：增加h1唯一性 -->
+    <header class="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
+        <div class="container mx-auto px-4 py-4 flex justify-center md:justify-start items-center">
+            <i class="fa fa-gamepad text-primary-500 text-xl mr-2"></i>
+            <h1 class="text-xl md:text-2xl font-bold text-neutral-800">
+                <span class="text-primary-600">小游戏</span>中心
+            </h1>
+        </div>
+    </header>
+
+    <!-- 核心内容区 - 增强语义化和色彩 -->
+    <main class="container mx-auto px-4 py-8 md:py-12">
+        <!-- 副标题 - SEO优化：h2语义化 -->
+        <div class="text-center mb-8 md:mb-12">
+            <h2 class="text-lg md:text-2xl font-semibold mb-2">
+                精选<span class="text-primary-600">10款</span>小游戏 · 即点即玩
+            </h2>
+            <p class="text-neutral-600 max-w-2xl mx-auto">无需下载，打开浏览器就能玩，轻松享受游戏乐趣</p>
+        </div>
+
+        <!-- 游戏网格 - 色彩增强 -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+            <!-- 游戏1 - SEO优化：增加alt文本和title属性 -->
+            <a href="./2048.html" class="game-item" title="2048 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="./2048.jpeg" alt="2048 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">2048</p>
+                </div>
+            </a>
+            <!-- 游戏2 -->
+            <a href="./minesweeper.html" class="game-item" title="扫雷 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="./minesweeper.jpeg" alt="扫雷 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">扫雷</p>
+                </div>
+            </a>
+            <!-- 游戏3 -->
+            <a href="./sudoku.html" class="game-item" title="数独 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="./sudoku.jpg" alt="数独 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">数独</p>
+                </div>
+            </a>
+            <!-- 游戏4 -->
+            <a href="./typing-game.html" class="game-item" title="打字练习 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="./typing-game.jpg" alt="打字练习 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">打字练习</p>
+                </div>
+            </a>
+            <!-- 游戏5 -->
+            <a href="./tetris.html" class="game-item" title="俄罗斯方块 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="./tetris.jpg" alt="俄罗斯方块 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">俄罗斯方块</p>
+                </div>
+            </a>
+            <!-- 游戏6 -->
+            <a href="https://gallery.selfboot.cn/zh/games/sokoban" class="game-item" title="推箱子 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="https://slefboot-1251736664.file.myqcloud.com/20241116_ai_gallery_sokoban_small.png/webp800"
+                        alt="推箱子 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">推箱子</p>
+                </div>
+            </a>
+            <!-- 游戏7 -->
+            <a href="https://gallery.selfboot.cn/zh/games/sliding" class="game-item" title="数字华容道 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="https://slefboot-1251736664.file.myqcloud.com/20241031_ai_gallery_sliding_small.png/webp800"
+                        alt="数字华容道 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">数字华容道</p>
+                </div>
+            </a>
+            <!-- 游戏8 -->
+            <a href="https://gallery.selfboot.cn/zh/games/gomoku" class="game-item" title="五子棋 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="https://slefboot-1251736664.file.myqcloud.com/20241031_ai_gallery_gomoku_small.png/webp800"
+                        alt="五子棋 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">五子棋</p>
+                </div>
+            </a>
+            <!-- 游戏9 -->
+            <a href="https://gallery.selfboot.cn/zh/games/chess" class="game-item" title="中国象棋 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="https://slefboot-1251736664.file.myqcloud.com/20241031_ai_gallery_2048_chess.png/webp800"
+                        alt="中国象棋 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">中国象棋</p>
+                </div>
+            </a>
+            <!-- 游戏10 -->
+            <a href="https://gallery.selfboot.cn/zh/games/snake" class="game-item" title="贪吃蛇 - 免费在线玩">
+                <div class="aspect-video bg-neutral-100 rounded-t-lg flex items-center justify-center overflow-hidden">
+                    <img src="https://slefboot-1251736664.file.myqcloud.com/20241031_ai_gallery_snake_small.png/webp800"
+                        alt="贪吃蛇 封面图"
+                        class="w-full h-full object-cover rounded-t-lg transition-transform duration-500 hover:scale-105">
+                </div>
+                <div class="p-3 text-center">
+                    <p class="game-name text-[var(--card-color)]">贪吃蛇</p>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <!-- 页脚 - SEO优化：增加站点信息 -->
+    <footer class="bg-white border-t border-neutral-200 py-6 mt-8">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm text-neutral-600 mb-2">小游戏中心 © 2025 保留所有权利</p>
+            <p class="text-xs text-neutral-500">本站提供免费在线小游戏，无需注册，即点即玩</p>
+            <!-- SEO优化：增加站点地图链接（可选） -->
+            <p class="text-xs text-primary-500 mt-2"><a href="" rel="sitemap">站点地图</a></p>
+        </div>
+    </footer>
+</body>
+
+</html>

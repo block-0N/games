@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打字练习游戏</title>
+    <link rel="stylesheet" href="./typing-game.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⌨️ 打字练习</h1>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-label">时间</span>
+                <span class="stat-value" id="timer">60</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">WPM</span>
+                <span class="stat-value" id="wpm">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">准确率</span>
+                <span class="stat-value" id="accuracy">100%</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">字符</span>
+                <span class="stat-value" id="chars">0</span>
+            </div>
+        </div>
+
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">简单</button>
+            <button class="difficulty-btn" data-difficulty="medium">中等</button>
+            <button class="difficulty-btn" data-difficulty="hard">困难</button>
+        </div>
+
+        <div class="language-selector">
+            <button class="language-btn active" data-language="random">🎲 随机</button>
+            <button class="language-btn" data-language="english">🇺🇸 英文</button>
+            <button class="language-btn" data-language="chinese">🇨🇳 中文</button>
+        </div>
+
+        <div class="typing-area" id="typing-area">
+            <div class="text-display" id="text-display">
+                <span class="cursor">|</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="start-btn">开始练习</button>
+            <button class="btn" id="restart-btn">重新开始</button>
+        </div>
+
+        <div class="instructions">
+            <p><strong>游戏规则：</strong>点击"开始练习"后，尽可能快速准确地输入显示的文本。时间结束后会显示你的打字速度（WPM）和准确率。</p>
+        </div>
+
+        <div class="result-modal" id="result-modal">
+            <div class="modal-content">
+                <h2>🎉 练习完成！</h2>
+                <div class="result-stats">
+                    <div class="result-item">
+                        <span class="result-label">WPM</span>
+                        <span class="result-value" id="final-wpm">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">准确率</span>
+                        <span class="result-value" id="final-accuracy">0%</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">总字符数</span>
+                        <span class="result-value" id="final-chars">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">错误字符</span>
+                        <span class="result-value" id="final-errors">0</span>
+                    </div>
+                </div>
+                <button class="btn primary" id="close-modal-btn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="typing-game.js"></script>
+</body>
+</html>
