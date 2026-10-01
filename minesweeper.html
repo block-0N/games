@@ -3,58 +3,74 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>扫雷游戏</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1c1c1c" media="(prefers-color-scheme: dark)">
+    <title>扫雷</title>
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <h1>扫雷</h1>
-        </header>
+    <div class="ui-shell">
+        <div class="ui-window">
+            <header class="ui-window__header">
+                <div>
+                    <h1 class="ui-window__title">扫雷</h1>
+                    <p class="ui-window__subtitle">揭开所有非雷格</p>
+                </div>
+                <button class="ui-btn ui-btn--primary" id="reset-btn">新游戏</button>
+            </header>
 
-        <div class="game-info">
-            <div class="info-box">
-                <span class="info-label">剩余雷数</span>
-                <span class="info-value" id="mines-count">10</span>
-            </div>
-            <button class="reset-btn" id="reset-btn">🙂</button>
-            <div class="info-box">
-                <span class="info-label">时间</span>
-                <span class="info-value" id="timer">000</span>
-            </div>
-        </div>
-        <div class="stats-bar">
-            <div class="stat-item">
-                <span class="stat-label">3BV</span>
-                <span class="stat-value" id="bbv">-</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">IOE</span>
-                <span class="stat-value" id="ioe">-</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">点击</span>
-                <span class="stat-value" id="clicks">0</span>
-            </div>
-        </div>
-        <div class="difficulty-selector">
-            <button class="difficulty-btn active" data-difficulty="easy">简单</button>
-            <button class="difficulty-btn" data-difficulty="medium">中等</button>
-            <button class="difficulty-btn" data-difficulty="hard">困难</button>
-        </div>
+            <div class="ui-window__body">
+                <div class="ui-stats">
+                    <div class="ui-stat">
+                        <span class="ui-stat__label">剩余雷数</span>
+                        <span class="ui-stat__value" id="mines-count">10</span>
+                    </div>
+                    <div class="ui-stat">
+                        <span class="ui-stat__label">用时</span>
+                        <span class="ui-stat__value" id="timer">000</span>
+                    </div>
+                </div>
 
-        <div class="game-board-wrapper">
-            <div class="game-board" id="game-board"></div>
-        </div>
+                <div class="ui-stats">
+                    <div class="ui-stat">
+                        <span class="ui-stat__label">3BV</span>
+                        <span class="ui-stat__value" id="bbv">-</span>
+                    </div>
+                    <div class="ui-stat">
+                        <span class="ui-stat__label">IOE</span>
+                        <span class="ui-stat__value" id="ioe">-</span>
+                    </div>
+                    <div class="ui-stat">
+                        <span class="ui-stat__label">点击</span>
+                        <span class="ui-stat__value" id="clicks">0</span>
+                    </div>
+                </div>
 
-        <div class="instructions">
-            <p><strong>游戏规则：</strong>左键点击揭开格子，右键点击标记地雷。找出所有非雷格子即为胜利！</p>
-        </div>
+                <div class="ui-segment" id="difficulty">
+                    <button class="ui-segment__item is-active" data-difficulty="easy">简单</button>
+                    <button class="ui-segment__item" data-difficulty="medium">中等</button>
+                    <button class="ui-segment__item" data-difficulty="hard">困难</button>
+                </div>
 
-        <div class="game-message" id="game-message">
-            <p></p>
-            <button class="retry-btn">再试一次</button>
+                <div class="minesweeper-board-wrapper">
+                    <div class="minesweeper-board" id="game-board"></div>
+                </div>
+            </div>
+
+            <footer class="ui-window__footer">
+                左键揭开 · 右键标旗 · 数字格上左右同按快速揭开
+            </footer>
+        </div>
+    </div>
+
+    <div class="ui-modal" id="game-message">
+        <div class="ui-modal__content">
+            <h2 class="ui-modal__title" id="game-message-title">游戏结束</h2>
+            <p class="ui-modal__desc" id="game-message-desc"></p>
+            <div class="ui-modal__actions">
+                <button class="ui-btn ui-btn--primary" id="retry-btn">再试一次</button>
+            </div>
         </div>
     </div>
 

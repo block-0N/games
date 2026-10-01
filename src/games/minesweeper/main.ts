@@ -1,3 +1,4 @@
+import '../../styles/theme.css'
 import './style.css'
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -26,15 +27,18 @@ class Minesweeper {
     private firstClick = true
     private timer = 0
     private timerInterval: number | null = null
-
     private clicks = 0
     private bbv = 0
+
+    private readonly isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
     private readonly gameBoard: HTMLElement
     private readonly minesCountElement: HTMLElement
     private readonly timerElement: HTMLElement
     private readonly resetBtn: HTMLElement
     private readonly gameMessage: HTMLElement
+    private readonly messageTitle: HTMLElement
+    private readonly messageDesc: HTMLElement
     private readonly retryBtn: HTMLElement
     private readonly difficultyBtns: NodeListOf<HTMLButtonElement>
     private readonly bbvElement: HTMLElement
@@ -47,8 +51,10 @@ class Minesweeper {
         this.timerElement = document.getElementById('timer')!
         this.resetBtn = document.getElementById('reset-btn')!
         this.gameMessage = document.getElementById('game-message')!
-        this.retryBtn = document.querySelector('.retry-btn')!
-        this.difficultyBtns = document.querySelectorAll<HTMLButtonElement>('.difficulty-btn')
+        this.messageTitle = document.getElementById('game-message-title')!
+        this.messageDesc = document.getElementById('game-message-desc')!
+        this.retryBtn = document.getElementById('retry-btn')!
+        this.difficultyBtns = document.querySelectorAll<HTMLButtonElement>('.ui-segment__item')
         this.bbvElement = document.getElementById('bbv')!
         this.ioeElement = document.getElementById('ioe')!
         this.clicksElement = document.getElementById('clicks')!
@@ -68,8 +74,8 @@ class Minesweeper {
         this.difficultyBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 this.currentDifficulty = (btn.dataset.difficulty as Difficulty) ?? 'easy'
-                this.difficultyBtns.forEach(b => b.classList.remove('active'))
-                btn.classList.add('active')
+                this.difficultyBtns.forEach(b => b.classList.remove('is-active'))
+                btn.classList.add('is-active')
                 this.startNewGame()
             })
         })
@@ -100,13 +106,13 @@ class Minesweeper {
     }
 
     private placeMines(excludeRow: number, excludeCol: number): void {
-        let minesPlaced = 0
-        while (minesPlaced < this.totalMines) {
+        let placed = 0
+        while (placed < this.totalMines) {
             const row = Math.floor(Math.random() * this.rows)
             const col = Math.floor(Math.random() * this.cols)
             if (this.board[row][col] !== -1 && !(row === excludeRow && col === excludeCol)) {
                 this.board[row][col] = -1
-                minesPlaced++
+                placed++
             }
         }
         this.calculateNumbers()
@@ -131,9 +137,6 @@ class Minesweeper {
         }
     }
 
-    // ========== 3BV 计算 ==========
-    // 3BV = 打开所有非雷格所需的最少左键点击数
-    // = 空白区域数量（每块 8 邻域连通的 0 区域算 1 次）+ 独立的数字格数量
     private calculate3BV(): number {
         const visited = Array.from({ length: this.rows }, () => Array<boolean>(this.cols).fill(false))
         let bbv = 0
@@ -142,23 +145,21 @@ class Minesweeper {
             for (let col = 0; col < this.cols; col++) {
                 if (this.board[row][col] === 0 && !visited[row][col]) {
                     bbv++
-                    this.floodFillFor3BV(row, col, visited)
+                    this.floodFill3BV(row, col, visited)
                 }
             }
         }
 
         for (let row = 0; row < this.rows; row++) {
             for (let col = 0; col < this.cols; col++) {
-                if (this.board[row][col] > 0 && !visited[row][col]) {
-                    bbv++
-                }
+                if (this.board[row][col] > 0 && !visited[row][col]) bbv++
             }
         }
 
         return bbv
     }
 
-    private floodFillFor3BV(startRow: number, startCol: number, visited: boolean[][]): void {
+    private floodFill3BV(startRow: number, startCol: number, visited: boolean[][]): void {
         const queue: [number, number][] = [[startRow, startCol]]
         visited[startRow][startCol] = true
 
@@ -170,13 +171,10 @@ class Minesweeper {
                     const nr = row + i
                     const nc = col + j
                     if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue
-                    if (visited[nr][nc]) continue
-                    if (this.board[nr][nc] === -1) continue
+                    if (visited[nr][nc] || this.board[nr][nc] === -1) continue
 
                     visited[nr][nc] = true
-                    if (this.board[nr][nc] === 0) {
-                        queue.push([nr, nc])
-                    }
+                    if (this.board[nr][nc] === 0) queue.push([nr, nc])
                 }
             }
         }
@@ -185,47 +183,95 @@ class Minesweeper {
     private updateStats(): void {
         this.bbvElement.textContent = this.bbv > 0 ? String(this.bbv) : '-'
         this.clicksElement.textContent = String(this.clicks)
-        if (this.bbv > 0 && this.clicks > 0) {
-            this.ioeElement.textContent = (this.bbv / this.clicks).toFixed(2)
-        } else {
-            this.ioeElement.textContent = '-'
-        }
+        this.ioeElement.textContent =
+            this.bbv > 0 && this.clicks > 0 ? (this.bbv / this.clicks).toFixed(2) : '-'
     }
 
     private renderBoard(): void {
         this.gameBoard.innerHTML = ''
 
         let cellSize: number
-        if (this.currentDifficulty === 'hard') cellSize = 25
-        else if (this.currentDifficulty === 'medium') cellSize = 28
-        else cellSize = 30
+        if (this.currentDifficulty === 'hard') cellSize = 26
+        else if (this.currentDifficulty === 'medium') cellSize = 30
+        else cellSize = 36
 
         this.gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize}px)`
 
         for (let row = 0; row < this.rows; row++) {
             for (let col = 0; col < this.cols; col++) {
                 const cell = document.createElement('div')
-                cell.className = 'cell'
+                cell.className = 'minesweeper-cell'
                 cell.dataset.row = String(row)
                 cell.dataset.col = String(col)
                 cell.style.width = `${cellSize}px`
                 cell.style.height = `${cellSize}px`
                 cell.style.fontSize = `${cellSize * 0.5}px`
 
-                cell.addEventListener('click', () => this.handleClick(row, col))
-                cell.addEventListener('contextmenu', e => this.handleRightClick(e, row, col))
-
-                // 左右键同时按 → chord
-                cell.addEventListener('mousedown', e => {
-                    if (e.buttons === 3) {
-                        e.preventDefault()
-                        this.chord(row, col)
-                    }
-                })
-
+                this.bindCellEvents(cell, row, col)
                 this.gameBoard.appendChild(cell)
             }
         }
+    }
+
+    private bindCellEvents(cell: HTMLElement, row: number, col: number): void {
+        let longPressTimer: number | null = null
+        let longPressFired = false
+        let clickTimer: number | null = null
+
+        const cancelLongPress = () => {
+            if (longPressTimer !== null) {
+                clearTimeout(longPressTimer)
+                longPressTimer = null
+            }
+        }
+
+        cell.addEventListener('contextmenu', e => {
+            e.preventDefault()
+            this.handleRightClick(row, col)
+        })
+
+        cell.addEventListener('touchstart', () => {
+            longPressFired = false
+            longPressTimer = window.setTimeout(() => {
+                longPressTimer = null
+                longPressFired = true
+                this.handleRightClick(row, col)
+            }, 450)
+        }, { passive: true })
+
+        cell.addEventListener('touchmove', cancelLongPress)
+        cell.addEventListener('touchcancel', cancelLongPress)
+        cell.addEventListener('touchend', cancelLongPress)
+
+        cell.addEventListener('click', e => {
+            if (longPressFired) {
+                longPressFired = false
+                return
+            }
+            e.preventDefault()
+
+            if (this.isTouch) {
+                if (clickTimer !== null) {
+                    clearTimeout(clickTimer)
+                    clickTimer = null
+                    this.chord(row, col)
+                    return
+                }
+                clickTimer = window.setTimeout(() => {
+                    clickTimer = null
+                    this.handleClick(row, col)
+                }, 220)
+            } else {
+                this.handleClick(row, col)
+            }
+        })
+
+        cell.addEventListener('mousedown', e => {
+            if (e.buttons === 3) {
+                e.preventDefault()
+                this.chord(row, col)
+            }
+        })
     }
 
     private handleClick(row: number, col: number): void {
@@ -250,8 +296,7 @@ class Minesweeper {
         this.updateStats()
     }
 
-    private handleRightClick(e: MouseEvent, row: number, col: number): void {
-        e.preventDefault()
+    private handleRightClick(row: number, col: number): void {
         if (this.gameOver || this.revealed[row][col]) return
 
         if (this.firstClick) {
@@ -267,11 +312,8 @@ class Minesweeper {
         this.updateStats()
     }
 
-    // ========== Chord：在已揭开的数字格上左右键同时按 ==========
-    // 若周围旗帜数 === 该数字，则揭开周围所有未标记的格子
     private chord(row: number, col: number): void {
-        if (this.gameOver) return
-        if (!this.revealed[row][col]) return
+        if (this.gameOver || !this.revealed[row][col]) return
 
         const value = this.board[row][col]
         if (value <= 0) return
@@ -286,11 +328,8 @@ class Minesweeper {
                 const nc = col + j
                 if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue
 
-                if (this.flagged[nr][nc]) {
-                    flagCount++
-                } else if (!this.revealed[nr][nc]) {
-                    toReveal.push([nr, nc])
-                }
+                if (this.flagged[nr][nc]) flagCount++
+                else if (!this.revealed[nr][nc]) toReveal.push([nr, nc])
             }
         }
 
@@ -334,8 +373,8 @@ class Minesweeper {
 
         this.revealed[row][col] = true
         this.updateCell(row, col)
-        const explodedCell = this.getCell(row, col)
-        if (explodedCell) explodedCell.classList.add('exploded')
+        const exploded = this.getCell(row, col)
+        if (exploded) exploded.classList.add('is-exploded')
 
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
@@ -350,7 +389,7 @@ class Minesweeper {
                     this.revealed[r][c] = true
                     this.updateCell(r, c)
                     const cell = this.getCell(r, c)
-                    if (cell) cell.classList.add('mine-wrong')
+                    if (cell) cell.classList.add('is-wrong')
                 }
             }
         }
@@ -369,6 +408,7 @@ class Minesweeper {
         if (revealedCount === this.rows * this.cols - this.totalMines) {
             this.gameOver = true
             this.stopTimer()
+
             for (let row = 0; row < this.rows; row++) {
                 for (let col = 0; col < this.cols; col++) {
                     if (this.board[row][col] === -1) {
@@ -377,6 +417,7 @@ class Minesweeper {
                     }
                 }
             }
+
             this.updateMinesCount()
             this.showGameMessage(true)
         }
@@ -387,17 +428,17 @@ class Minesweeper {
         if (!cell) return
 
         if (this.revealed[row][col]) {
-            cell.classList.add('revealed')
+            cell.classList.add('is-revealed')
 
             if (this.board[row][col] === -1) {
-                cell.classList.add('mine')
+                cell.classList.add('is-mine')
             } else if (this.board[row][col] > 0) {
                 cell.textContent = String(this.board[row][col])
                 cell.dataset.num = String(this.board[row][col])
             }
         }
 
-        cell.classList.toggle('flagged', this.flagged[row][col])
+        cell.classList.toggle('is-flagged', this.flagged[row][col])
     }
 
     private getCell(row: number, col: number): HTMLElement | null {
@@ -429,20 +470,21 @@ class Minesweeper {
     }
 
     private showGameMessage(won: boolean): void {
-        this.gameMessage.style.display = 'flex'
-        this.gameMessage.className = 'game-message'
-        const p = this.gameMessage.querySelector('p')
         if (won) {
-            this.gameMessage.classList.add('game-won')
-            if (p) p.textContent = '🎉 恭喜获胜！'
+            this.messageTitle.textContent = '🎉 恭喜获胜！'
+            const ioE = this.clicks > 0 ? (this.bbv / this.clicks).toFixed(2) : '-'
+            this.messageDesc.innerHTML = `用时 <strong>${this.timer}</strong> 秒 · 3BV <strong>${this.bbv}</strong> · IOE <strong>${ioE}</strong>`
+            this.retryBtn.textContent = '再来一局'
         } else {
-            this.gameMessage.classList.add('game-over')
-            if (p) p.textContent = '💣 游戏结束！'
+            this.messageTitle.textContent = '💣 游戏结束'
+            this.messageDesc.innerHTML = `坚持了 <strong>${this.timer}</strong> 秒，再试一次吧`
+            this.retryBtn.textContent = '再试一次'
         }
+        this.gameMessage.classList.add('is-open')
     }
 
     private hideGameMessage(): void {
-        this.gameMessage.style.display = 'none'
+        this.gameMessage.classList.remove('is-open')
     }
 }
 
