@@ -199,19 +199,24 @@ class Minesweeper {
     private explode(row: number, col: number): void {
         this.gameOver = true
         this.stopTimer()
+
         this.revealed[row][col] = true
         this.updateCell(row, col)
-
-        // 修复：标记爆炸格，让它和其他地雷区分开
         const explodedCell = this.getCell(row, col)
         if (explodedCell) explodedCell.classList.add('exploded')
 
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
-                if (this.board[r][c] === -1 && !(r === row && c === col)) {
+                if (r === row && c === col) continue
+
+                if (this.board[r][c] === -1) {
+                    if (!this.flagged[r][c]) {
+                        this.revealed[r][c] = true
+                        this.updateCell(r, c)
+                    }
+                } else if (this.flagged[r][c]) {
                     this.revealed[r][c] = true
                     this.updateCell(r, c)
-                } else if (this.flagged[r][c] && this.board[r][c] !== -1) {
                     const cell = this.getCell(r, c)
                     if (cell) cell.classList.add('mine-wrong')
                 }
@@ -240,7 +245,6 @@ class Minesweeper {
                     }
                 }
             }
-            // 修复：胜利后同步剩余雷数
             this.updateMinesCount()
             this.showGameMessage(true)
         }
