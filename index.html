@@ -4,16 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小游戏中心 - 精选10款免费在线小游戏，即点即玩</title>
-    <meta name="description" content="小游戏中心提供10款精选免费在线小游戏，无需下载，即点即玩，包含休闲、益智等多种趣味小游戏，适合各年龄段玩家。">
+    <title>小游戏中心 - 精选多款免费在线小游戏，即点即玩</title>
+    <meta name="description" content="小游戏中心提供多款精选免费在线小游戏，无需下载，即点即玩，包含休闲、益智等多种趣味小游戏，适合各年龄段玩家。">
     <meta name="keywords" content="小游戏,在线小游戏,免费小游戏,休闲小游戏,益智小游戏,小游戏中心">
     <meta name="author" content="小游戏中心">
     <meta name="robots" content="index, follow">
-    <meta property="og:title" content="小游戏中心 - 精选10款免费在线小游戏">
-    <meta property="og:description" content="无需下载，即点即玩，10款精选小游戏等你来体验！">
+    <meta property="og:title" content="小游戏中心 - 精选多款免费在线小游戏">
+    <meta property="og:description" content="无需下载，即点即玩，多款精选小游戏等你来体验！">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://block-0n.github.io/games">
-    <meta property="og:image" content="./games.jpeg">
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -36,73 +35,11 @@
             <div class="box-group">
                 <div class="filter-card difficulty-card">
                     <h3>按难度筛选</h3>
-                    <div class="inner-grid">
-                        <button class="btn active" data-diff="all">
-                            <div>0</div>
-                            <div>全部</div>
-                        </button>
-                        <button class="btn btn-type1" data-diff="easy">
-                            <div>0</div>
-                            <div>简单</div>
-                        </button>
-                        <button class="btn btn-type2" data-diff="mid">
-                            <div>0</div>
-                            <div>中等</div>
-                        </button>
-                        <button class="btn btn-type3" data-diff="hard">
-                            <div>0</div>
-                            <div>困难</div>
-                        </button>
-                    </div>
+                    <div class="inner-grid" id="difficultyGrid"></div>
                 </div>
                 <div class="filter-card category-card">
                     <h3>按类别筛选</h3>
-                    <div class="inner-grid">
-                        <button class="btn active" data-cate="all">
-                            <div>0</div>
-                            <div>所有分类</div>
-                        </button>
-                        <button class="btn btn-type5" data-cate="logic">
-                            <div>0</div>
-                            <div>逻辑推理</div>
-                        </button>
-                        <button class="btn btn-type1" data-cate="path">
-                            <div>0</div>
-                            <div>路径连接</div>
-                        </button>
-                        <button class="btn btn-type9" data-cate="area">
-                            <div>0</div>
-                            <div>区域划分</div>
-                        </button>
-                        <button class="btn btn-type6" data-cate="num">
-                            <div>0</div>
-                            <div>数字游戏</div>
-                        </button>
-                        <button class="btn btn-type7" data-cate="fill">
-                            <div>0</div>
-                            <div>图案填充</div>
-                        </button>
-                        <button class="btn btn-type8" data-cate="move">
-                            <div>0</div>
-                            <div>移动策略</div>
-                        </button>
-                        <button class="btn btn-type9" data-cate="special">
-                            <div>0</div>
-                            <div>特殊谜题</div>
-                        </button>
-                        <button class="btn btn-type3" data-cate="qi">
-                            <div>0</div>
-                            <div>棋类游戏</div>
-                        </button>
-                        <button class="btn btn-type5" data-cate="rea">
-                            <div>0</div>
-                            <div>反应训练</div>
-                        </button>
-                        <button class="btn btn-type1" data-cate="fun">
-                            <div>0</div>
-                            <div>趣味游戏</div>
-                        </button>
-                    </div>
+                    <div class="inner-grid" id="categoryGrid"></div>
                 </div>
             </div>
         </div>
@@ -118,109 +55,100 @@
     </footer>
     <script src="./data.js"></script>
     <script>
-        let filterState = {
-            diff: "all",
-            cate: "all"
-        };
-        function refreshCountNumber() {
-            const diffCount = {
-                all: gameList.length,
-                easy: gameList.filter(g => g.difficulty === "easy").length,
-                mid: gameList.filter(g => g.difficulty === "mid").length,
-                hard: gameList.filter(g => g.difficulty === "hard").length
-            };
-            document.querySelectorAll(".difficulty-card .btn").forEach(btn => {
-                const diffKey = btn.dataset.diff;
-                btn.querySelector("div:first-child").innerText = diffCount[diffKey];
-            });
-            const cateCount = {
-                all: gameList.length,
-                logic: gameList.filter(g => g.category === "logic").length,
-                path: gameList.filter(g => g.category === "path").length,
-                area: gameList.filter(g => g.category === "area").length,
-                num: gameList.filter(g => g.category === "num").length,
-                fill: gameList.filter(g => g.category === "fill").length,
-                move: gameList.filter(g => g.category === "move").length,
-                special: gameList.filter(g => g.category === "special").length,
-                fun: gameList.filter(g => g.category === "fun").length,
-                qi: gameList.filter(g => g.category === "qi").length,
-                rea: gameList.filter(g => g.category === "rea").length
-            };
-            document.querySelectorAll(".category-card .btn").forEach(btn => {
-                const cateKey = btn.dataset.cate;
-                btn.querySelector("div:first-child").innerText = cateCount[cateKey];
+        const state = { diff: "all", cate: "all" };
+
+        function getCount(field, key) {
+            if (key === "all") return gameList.length;
+            return gameList.filter(g => g[field] === key).length;
+        }
+
+        function updateActive(containerSelector, dataKey, value) {
+            document.querySelectorAll(`${containerSelector} .btn`).forEach(btn => {
+                btn.classList.toggle("active", btn.dataset[dataKey] === value);
             });
         }
-        function renderGames() {
-            const gridWrap = document.querySelector(".game-grid");
-            gridWrap.innerHTML = "";
-            const fragment = document.createDocumentFragment();
-            const filterGames = gameList.filter(item => {
-                const diffMatch = filterState.diff === "all" || item.difficulty === filterState.diff;
-                const cateMatch = filterState.cate === "all" || item.category === filterState.cate;
-                return diffMatch && cateMatch;
+
+        function renderFilterButtons() {
+            const diffGrid = document.getElementById("difficultyGrid");
+            diffGrid.innerHTML = "";
+            difficulties.forEach(d => {
+                const btn = document.createElement("button");
+                btn.className = "btn" + (d.type ? " btn-type" + d.type : "");
+                if (d.key === state.diff) btn.classList.add("active");
+                btn.dataset.diff = d.key;
+                btn.innerHTML = `<div>${getCount("difficulty", d.key)}</div><div>${d.label}</div>`;
+                btn.addEventListener("click", () => {
+                    state.diff = d.key;
+                    updateActive(".difficulty-card", "diff", state.diff);
+                    renderGames();
+                });
+                diffGrid.appendChild(btn);
             });
-            if (filterGames.length === 0) {
-                gridWrap.innerHTML = `<div class="empty-tip">暂无匹配的小游戏，换个筛选条件试试</div>`;
+
+            const cateGrid = document.getElementById("categoryGrid");
+            cateGrid.innerHTML = "";
+            categories.forEach(c => {
+                const btn = document.createElement("button");
+                btn.className = "btn" + (c.type ? " btn-type" + c.type : "");
+                if (c.key === state.cate) btn.classList.add("active");
+                btn.dataset.cate = c.key;
+                btn.innerHTML = `<div>${getCount("category", c.key)}</div><div>${c.label}</div>`;
+                btn.addEventListener("click", () => {
+                    state.cate = c.key;
+                    updateActive(".category-card", "cate", state.cate);
+                    renderGames();
+                });
+                cateGrid.appendChild(btn);
+            });
+        }
+
+        function renderGames() {
+            const grid = document.querySelector(".game-grid");
+            const filtered = gameList.filter(g =>
+                (state.diff === "all" || g.difficulty === state.diff) &&
+                (state.cate === "all" || g.category === state.cate)
+            );
+            grid.innerHTML = "";
+            if (!filtered.length) {
+                grid.innerHTML = `<div class="empty-tip">暂无匹配的小游戏，换个筛选条件试试</div>`;
                 return;
             }
-            filterGames.forEach(game => {
+            const fragment = document.createDocumentFragment();
+            filtered.forEach(game => {
                 const a = document.createElement("a");
                 a.className = "game-item";
                 a.href = game.link;
                 a.target = "_blank";
                 a.rel = "noopener noreferrer";
-                a.title = game.name + " - 免费在线玩";
-                const coverBox = document.createElement("div");
-                coverBox.className = "game-cover-box";
-                const img = document.createElement("img");
-                img.className = "game-cover";
-                img.src = game.img;
-                img.alt = game.name + " 封面图";
+                a.title = `${game.name} - 免费在线玩`;
+
+                const cover = document.createElement("div");
+                cover.className = "game-cover-box";
+                cover.style.setProperty("--cover-color", game.color);
+                const emoji = document.createElement("span");
+                emoji.className = "game-cover-emoji";
+                emoji.textContent = game.emoji;
+                emoji.setAttribute("aria-hidden", "true");
+                cover.appendChild(emoji);
+
                 const textWrap = document.createElement("div");
                 textWrap.className = "game-text";
                 const nameP = document.createElement("p");
                 nameP.className = "game-name";
-                nameP.innerText = game.name;
-                coverBox.appendChild(img);
+                nameP.textContent = game.name;
                 textWrap.appendChild(nameP);
-                a.appendChild(coverBox);
+
+                a.appendChild(cover);
                 a.appendChild(textWrap);
                 fragment.appendChild(a);
             });
-            gridWrap.appendChild(fragment);
+            grid.appendChild(fragment);
         }
-        function setActiveBtn(containerSelector, attr, value) {
-            const btns = document.querySelectorAll(`${containerSelector} .btn`);
-            btns.forEach(btn => {
-                if (btn.getAttribute(attr) === value) {
-                    btn.classList.add("active");
-                } else {
-                    btn.classList.remove("active");
-                }
-            });
-        }
-        function bindFilterEvent() {
-            document.querySelectorAll(".difficulty-card .btn").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    filterState.diff = btn.dataset.diff;
-                    setActiveBtn(".difficulty-card", "data-diff", filterState.diff);
-                    renderGames();
-                })
-            })
-            document.querySelectorAll(".category-card .btn").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    filterState.cate = btn.dataset.cate;
-                    setActiveBtn(".category-card", "data-cate", filterState.cate);
-                    renderGames();
-                })
-            })
-        }
+
         document.addEventListener("DOMContentLoaded", () => {
-            refreshCountNumber();
+            renderFilterButtons();
             renderGames();
-            bindFilterEvent();
-        })
+        });
     </script>
 </body>
 

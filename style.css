@@ -144,7 +144,7 @@ button {
 }
 
 .category-card .inner-grid {
-    grid-template-columns: repeat(4, 1fr)
+    grid-template-columns: repeat(3, 1fr)
 }
 
 .btn {
@@ -489,18 +489,32 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
-.game-cover {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 0.5rem 0.5rem 0 0;
-    transition: transform 0.5s ease;
+.game-cover-box::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: var(--cover-color, #3b82f6);
+    opacity: 0.14;
+    transition: opacity 0.3s ease;
 }
 
-.game-item:hover .game-cover {
-    transform: scale(1.05);
+.game-item:hover .game-cover-box::before {
+    opacity: 0.24;
+}
+
+.game-cover-emoji {
+    position: relative;
+    font-size: 2.75rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+    transition: transform 0.4s ease;
+}
+
+.game-item:hover .game-cover-emoji {
+    transform: scale(1.15) rotate(-6deg);
 }
 
 .game-text {
