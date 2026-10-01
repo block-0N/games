@@ -4,7 +4,7 @@
 
 :root {
     /* 背景层 */
-    --bg-base: #141414;
+    --bg-base: #0f0f0f;
     --bg-surface: rgba(255, 255, 255, 0.04);
     --bg-card: rgba(255, 255, 255, 0.05);
     --bg-subtle: rgba(0, 0, 0, 0.03);

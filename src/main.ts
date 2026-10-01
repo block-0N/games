@@ -1,3 +1,4 @@
+import './styles/theme.css'
 import './styles/home.css'
 import { difficulties, categories, gameList } from './data'
 import type { FilterState, FilterOption, Game, Difficulty, Category } from './types'
@@ -9,97 +10,116 @@ function getCount(field: 'difficulty' | 'category', key: string): number {
     return gameList.filter(g => g[field] === key).length
 }
 
-function updateActive(containerSelector: string, dataKey: string, value: string): void {
-    document.querySelectorAll<HTMLButtonElement>(`${containerSelector} .btn`).forEach(btn => {
-        btn.classList.toggle('active', btn.dataset[dataKey] === value)
-    })
-}
-
-function buildFilterButton(
+function createChip(
     option: FilterOption,
-    dataKey: 'diff' | 'cate',
-    field: 'difficulty' | 'category',
-    stateKey: keyof FilterState,
-    containerSelector: string
+    isActive: boolean,
+    count: number,
+    onClick: () => void
 ): HTMLButtonElement {
-    const btn = document.createElement('button')
-    btn.className = 'btn' + (option.type ? ` btn-type${option.type}` : '')
-    if (option.key === state[stateKey]) btn.classList.add('active')
-    btn.dataset[dataKey] = option.key
-    btn.innerHTML = `<div>${getCount(field, option.key)}</div><div>${option.label}</div>`
-    btn.addEventListener('click', () => {
-        if (dataKey === 'diff') {
-            state.diff = option.key as 'all' | Difficulty
-        } else {
-            state.cate = option.key as 'all' | Category
-        }
-        updateActive(containerSelector, dataKey, option.key)
-        renderGames()
-    })
-    return btn
+    const chip = document.createElement('button')
+    chip.type = 'button'
+    chip.className = 'chip' + (isActive ? ' is-active' : '')
+
+    const label = document.createTextNode(option.label)
+    chip.appendChild(label)
+
+    const countEl = document.createElement('span')
+    countEl.className = 'chip__count'
+    countEl.textContent = String(count)
+    chip.appendChild(countEl)
+
+    chip.addEventListener('click', onClick)
+    return chip
 }
 
-function renderFilterButtons(): void {
-    const diffGrid = document.getElementById('difficultyGrid')!
-    diffGrid.innerHTML = ''
+function renderDifficultyChips(): void {
+    const container = document.getElementById('difficulty-chips')
+    if (!container) return
+    container.innerHTML = ''
+
     difficulties.forEach(d => {
-        diffGrid.appendChild(buildFilterButton(d, 'diff', 'difficulty', 'diff', '.difficulty-card'))
-    })
-
-    const cateGrid = document.getElementById('categoryGrid')!
-    cateGrid.innerHTML = ''
-    categories.forEach(c => {
-        cateGrid.appendChild(buildFilterButton(c, 'cate', 'category', 'cate', '.category-card'))
+        const chip = createChip(d, state.diff === d.key, getCount('difficulty', d.key), () => {
+            state.diff = d.key as 'all' | Difficulty
+            renderDifficultyChips()
+            renderGames()
+        })
+        container.appendChild(chip)
     })
 }
 
-function buildGameCard(game: Game): HTMLAnchorElement {
+function renderCategoryChips(): void {
+    const container = document.getElementById('category-chips')
+    if (!container) return
+    container.innerHTML = ''
+
+    categories.forEach(c => {
+        const chip = createChip(c, state.cate === c.key, getCount('category', c.key), () => {
+            state.cate = c.key as 'all' | Category
+            renderCategoryChips()
+            renderGames()
+        })
+        container.appendChild(chip)
+    })
+}
+
+function createGameCard(game: Game): HTMLAnchorElement {
     const a = document.createElement('a')
-    a.className = 'game-item'
+    a.className = 'game-card'
     a.href = game.link
     a.target = '_blank'
     a.rel = 'noopener noreferrer'
-    a.title = `${game.name} - 免费在线玩`
+    a.style.setProperty('--card-color', game.color)
 
     const cover = document.createElement('div')
-    cover.className = 'game-cover-box'
-    cover.style.setProperty('--cover-color', game.color)
+    cover.className = 'game-card__cover'
 
     const emoji = document.createElement('span')
-    emoji.className = 'game-cover-emoji'
+    emoji.className = 'game-card__emoji'
     emoji.textContent = game.emoji
     emoji.setAttribute('aria-hidden', 'true')
     cover.appendChild(emoji)
 
-    const textWrap = document.createElement('div')
-    textWrap.className = 'game-text'
-    const nameP = document.createElement('p')
-    nameP.className = 'game-name'
-    nameP.textContent = game.name
-    textWrap.appendChild(nameP)
+    const name = document.createElement('div')
+    name.className = 'game-card__name'
+    name.textContent = game.name
 
     a.appendChild(cover)
-    a.appendChild(textWrap)
+    a.appendChild(name)
     return a
 }
 
 function renderGames(): void {
-    const grid = document.querySelector<HTMLDivElement>('.game-grid')!
+    const grid = document.getElementById('game-grid')
+    if (!grid) return
+
     const filtered = gameList.filter(g =>
         (state.diff === 'all' || g.difficulty === state.diff) &&
         (state.cate === 'all' || g.category === state.cate)
     )
+
     grid.innerHTML = ''
-    if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-tip">暂无匹配的小游戏，换个筛选条件试试</div>`
+
+    if (filtered.length === 0) {
+        const empty = document.createElement('div')
+        empty.className = 'empty-tip'
+        empty.textContent = '暂无匹配的小游戏，换个筛选条件试试'
+        grid.appendChild(empty)
         return
     }
+
     const fragment = document.createDocumentFragment()
-    filtered.forEach(game => fragment.appendChild(buildGameCard(game)))
+    filtered.forEach(game => fragment.appendChild(createGameCard(game)))
     grid.appendChild(fragment)
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    renderFilterButtons()
+function init(): void {
+    renderDifficultyChips()
+    renderCategoryChips()
     renderGames()
-})
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init)
+} else {
+    init()
+}
