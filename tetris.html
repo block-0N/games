@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>俄罗斯方块</title>
-    <link rel="stylesheet" href="tetris.css">
 </head>
 
 <body>
@@ -34,7 +33,7 @@
 
             <div class="controls">
                 <div class="control-btn" id="startBtn">开始游戏</div>
-                <div class="control-btn" id="pauseBtn">暂停</div>
+                <div class="control-btn disabled" id="pauseBtn">暂停</div>
                 <div class="control-btn" id="restartBtn">重新开始</div>
             </div>
 
@@ -54,7 +53,6 @@
         </div>
     </div>
 
-    <!-- 游戏结束模态框 -->
     <div class="modal" id="gameOverModal">
         <div class="modal-content">
             <h2>游戏结束!</h2>
@@ -63,7 +61,7 @@
         </div>
     </div>
 
-    <script src="tetris.js"></script>
+    <script type="module" src="/src/games/tetris/main.ts"></script>
 </body>
 
 </html>
