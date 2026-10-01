@@ -1,6 +1,6 @@
 /* 俄罗斯方块 */
 
-.tetris-window {
+.ui-window.tetris-window {
     max-width: 980px;
 }
 
@@ -24,7 +24,7 @@
 
 .tetris-main {
     display: grid;
-    grid-template-columns: 180px 1fr 180px;
+    grid-template-columns: minmax(140px, 180px) minmax(0, 1fr) minmax(140px, 180px);
     gap: var(--space-5);
     align-items: start;
 }
@@ -56,10 +56,11 @@
     background: #17171a;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-default);
+    width: 100%;
+    height: auto;
+    max-height: min(760px, calc(100vh - 180px));
     aspect-ratio: 1 / 2;
-    height: min(720px, calc(100vh - 200px));
-    width: auto;
-    max-width: 100%;
+    object-fit: contain;
     touch-action: none;
 }
 
@@ -133,9 +134,9 @@
     background: var(--accent-active);
 }
 
-/* 中等屏幕 */
+/* 窄屏：单列布局 */
 @media (max-width: 900px) {
-    .tetris-window {
+    .ui-window.tetris-window {
         max-width: 100%;
     }
 
@@ -169,8 +170,9 @@
     }
 
     #gameCanvas {
-        height: auto;
         width: min(100%, 280px);
+        height: auto;
+        max-height: none;
     }
 
     .tetris-touch {
