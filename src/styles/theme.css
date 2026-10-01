@@ -4,9 +4,9 @@
 
 :root {
     /* 背景层 */
-    --bg-base: #f3f3f3;
-    --bg-surface: rgba(255, 255, 255, 0.7);
-    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-base: #141414;
+    --bg-surface: rgba(255, 255, 255, 0.04);
+    --bg-card: rgba(255, 255, 255, 0.05);
     --bg-subtle: rgba(0, 0, 0, 0.03);
     --bg-hover: rgba(0, 0, 0, 0.05);
     --bg-active: rgba(0, 0, 0, 0.08);
