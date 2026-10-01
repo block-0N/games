@@ -27,6 +27,9 @@ class Minesweeper {
     private timer = 0
     private timerInterval: number | null = null
 
+    private clicks = 0
+    private bbv = 0
+
     private readonly gameBoard: HTMLElement
     private readonly minesCountElement: HTMLElement
     private readonly timerElement: HTMLElement
@@ -34,6 +37,9 @@ class Minesweeper {
     private readonly gameMessage: HTMLElement
     private readonly retryBtn: HTMLElement
     private readonly difficultyBtns: NodeListOf<HTMLButtonElement>
+    private readonly bbvElement: HTMLElement
+    private readonly ioeElement: HTMLElement
+    private readonly clicksElement: HTMLElement
 
     constructor() {
         this.gameBoard = document.getElementById('game-board')!
@@ -43,6 +49,9 @@ class Minesweeper {
         this.gameMessage = document.getElementById('game-message')!
         this.retryBtn = document.querySelector('.retry-btn')!
         this.difficultyBtns = document.querySelectorAll<HTMLButtonElement>('.difficulty-btn')
+        this.bbvElement = document.getElementById('bbv')!
+        this.ioeElement = document.getElementById('ioe')!
+        this.clicksElement = document.getElementById('clicks')!
 
         this.init()
     }
@@ -69,6 +78,8 @@ class Minesweeper {
     private startNewGame(): void {
         this.stopTimer()
         this.timer = 0
+        this.clicks = 0
+        this.bbv = 0
         this.timerElement.textContent = '000'
 
         const config = DIFFICULTIES[this.currentDifficulty]
@@ -83,6 +94,7 @@ class Minesweeper {
         this.firstClick = true
 
         this.updateMinesCount()
+        this.updateStats()
         this.hideGameMessage()
         this.renderBoard()
     }
@@ -119,6 +131,67 @@ class Minesweeper {
         }
     }
 
+    // ========== 3BV 计算 ==========
+    // 3BV = 打开所有非雷格所需的最少左键点击数
+    // = 空白区域数量（每块 8 邻域连通的 0 区域算 1 次）+ 独立的数字格数量
+    private calculate3BV(): number {
+        const visited = Array.from({ length: this.rows }, () => Array<boolean>(this.cols).fill(false))
+        let bbv = 0
+
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                if (this.board[row][col] === 0 && !visited[row][col]) {
+                    bbv++
+                    this.floodFillFor3BV(row, col, visited)
+                }
+            }
+        }
+
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                if (this.board[row][col] > 0 && !visited[row][col]) {
+                    bbv++
+                }
+            }
+        }
+
+        return bbv
+    }
+
+    private floodFillFor3BV(startRow: number, startCol: number, visited: boolean[][]): void {
+        const queue: [number, number][] = [[startRow, startCol]]
+        visited[startRow][startCol] = true
+
+        while (queue.length > 0) {
+            const [row, col] = queue.shift()!
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    if (i === 0 && j === 0) continue
+                    const nr = row + i
+                    const nc = col + j
+                    if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue
+                    if (visited[nr][nc]) continue
+                    if (this.board[nr][nc] === -1) continue
+
+                    visited[nr][nc] = true
+                    if (this.board[nr][nc] === 0) {
+                        queue.push([nr, nc])
+                    }
+                }
+            }
+        }
+    }
+
+    private updateStats(): void {
+        this.bbvElement.textContent = this.bbv > 0 ? String(this.bbv) : '-'
+        this.clicksElement.textContent = String(this.clicks)
+        if (this.bbv > 0 && this.clicks > 0) {
+            this.ioeElement.textContent = (this.bbv / this.clicks).toFixed(2)
+        } else {
+            this.ioeElement.textContent = '-'
+        }
+    }
+
     private renderBoard(): void {
         this.gameBoard.innerHTML = ''
 
@@ -142,6 +215,14 @@ class Minesweeper {
                 cell.addEventListener('click', () => this.handleClick(row, col))
                 cell.addEventListener('contextmenu', e => this.handleRightClick(e, row, col))
 
+                // 左右键同时按 → chord
+                cell.addEventListener('mousedown', e => {
+                    if (e.buttons === 3) {
+                        e.preventDefault()
+                        this.chord(row, col)
+                    }
+                })
+
                 this.gameBoard.appendChild(cell)
             }
         }
@@ -150,10 +231,13 @@ class Minesweeper {
     private handleClick(row: number, col: number): void {
         if (this.gameOver || this.flagged[row][col] || this.revealed[row][col]) return
 
+        this.clicks++
+
         if (this.firstClick) {
             this.firstClick = false
             this.placeMines(row, col)
             this.startTimer()
+            this.bbv = this.calculate3BV()
         }
 
         if (this.board[row][col] === -1) {
@@ -162,6 +246,8 @@ class Minesweeper {
             this.revealCell(row, col)
             this.checkWin()
         }
+
+        this.updateStats()
     }
 
     private handleRightClick(e: MouseEvent, row: number, col: number): void {
@@ -172,11 +258,57 @@ class Minesweeper {
             this.firstClick = false
             this.placeMines(row, col)
             this.startTimer()
+            this.bbv = this.calculate3BV()
         }
 
         this.flagged[row][col] = !this.flagged[row][col]
         this.updateCell(row, col)
         this.updateMinesCount()
+        this.updateStats()
+    }
+
+    // ========== Chord：在已揭开的数字格上左右键同时按 ==========
+    // 若周围旗帜数 === 该数字，则揭开周围所有未标记的格子
+    private chord(row: number, col: number): void {
+        if (this.gameOver) return
+        if (!this.revealed[row][col]) return
+
+        const value = this.board[row][col]
+        if (value <= 0) return
+
+        let flagCount = 0
+        const toReveal: [number, number][] = []
+
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                if (i === 0 && j === 0) continue
+                const nr = row + i
+                const nc = col + j
+                if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue
+
+                if (this.flagged[nr][nc]) {
+                    flagCount++
+                } else if (!this.revealed[nr][nc]) {
+                    toReveal.push([nr, nc])
+                }
+            }
+        }
+
+        if (flagCount !== value) return
+
+        this.clicks++
+
+        for (const [nr, nc] of toReveal) {
+            if (this.board[nr][nc] === -1) {
+                this.explode(nr, nc)
+                this.updateStats()
+                return
+            }
+            this.revealCell(nr, nc)
+        }
+
+        this.checkWin()
+        this.updateStats()
     }
 
     private revealCell(row: number, col: number): void {
