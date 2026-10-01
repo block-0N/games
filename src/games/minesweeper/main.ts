@@ -29,6 +29,7 @@ class Minesweeper {
     private timerInterval: number | null = null
     private clicks = 0
     private bbv = 0
+    private resizeTimeout: number | null = null
 
     private readonly isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
 
@@ -78,6 +79,14 @@ class Minesweeper {
                 btn.classList.add('is-active')
                 this.startNewGame()
             })
+        })
+
+        window.addEventListener('resize', () => {
+            if (this.resizeTimeout !== null) clearTimeout(this.resizeTimeout)
+            this.resizeTimeout = window.setTimeout(() => {
+                this.resizeTimeout = null
+                this.rerender()
+            }, 200)
         })
     }
 
@@ -187,14 +196,27 @@ class Minesweeper {
             this.bbv > 0 && this.clicks > 0 ? (this.bbv / this.clicks).toFixed(2) : '-'
     }
 
+    // 根据窗口宽度和当前列数动态计算格子大小
+    private calculateCellSize(): number {
+        const vw = window.innerWidth
+        const isMobile = vw <= 640
+        const containerWidth = isMobile
+            ? vw - 48
+            : Math.min(vw - 80, 880)
+
+        const gap = 2
+        const boardPadding = 8
+        const available = containerWidth - boardPadding * 2 - gap * (this.cols - 1)
+        const cellSize = Math.floor(available / this.cols)
+
+        const min = isMobile ? 28 : 24
+        const max = 48
+        return Math.max(min, Math.min(max, cellSize))
+    }
+
     private renderBoard(): void {
         this.gameBoard.innerHTML = ''
-
-        let cellSize: number
-        if (this.currentDifficulty === 'hard') cellSize = 26
-        else if (this.currentDifficulty === 'medium') cellSize = 30
-        else cellSize = 36
-
+        const cellSize = this.calculateCellSize()
         this.gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, ${cellSize}px)`
 
         for (let row = 0; row < this.rows; row++) {
@@ -209,6 +231,22 @@ class Minesweeper {
 
                 this.bindCellEvents(cell, row, col)
                 this.gameBoard.appendChild(cell)
+            }
+        }
+    }
+
+    // 重绘（resize 时保留状态）
+    private rerender(): void {
+        this.renderBoard()
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                this.updateCell(row, col)
+                if (this.revealed[row][col] && this.board[row][col] === -1) {
+                    const cell = this.getCell(row, col)
+                    if (cell && this.gameOver) {
+                        // 若已爆炸，重新标记 exploded 由 explode 时的状态决定，不重绘
+                    }
+                }
             }
         }
     }
