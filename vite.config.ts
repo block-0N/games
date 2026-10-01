@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import { resolve } from 'node:path'
+import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
     base: '/games/',
@@ -9,12 +9,12 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                main: resolve(__dirname, 'index.html'),
-                '2048': resolve(__dirname, '2048.html'),
-                minesweeper: resolve(__dirname, 'minesweeper.html'),
-                sudoku: resolve(__dirname, 'sudoku.html'),
-                tetris: resolve(__dirname, 'tetris.html'),
-                typing: resolve(__dirname, 'typing-game.html')
+                main: fileURLToPath(new URL('./index.html', import.meta.url)),
+                '2048': fileURLToPath(new URL('./2048.html', import.meta.url)),
+                minesweeper: fileURLToPath(new URL('./minesweeper.html', import.meta.url)),
+                sudoku: fileURLToPath(new URL('./sudoku.html', import.meta.url)),
+                tetris: fileURLToPath(new URL('./tetris.html', import.meta.url)),
+                typing: fileURLToPath(new URL('./typing-game.html', import.meta.url))
             }
         }
     }
