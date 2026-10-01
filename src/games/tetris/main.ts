@@ -1,3 +1,4 @@
+import '../../styles/theme.css'
 import './style.css'
 
 interface Piece {
@@ -11,6 +12,8 @@ interface PieceTemplate {
     shape: number[][]
     color: string
 }
+
+type TouchAction = 'left' | 'right' | 'down' | 'rotate' | 'drop'
 
 class Tetris {
     private readonly canvas: HTMLCanvasElement
@@ -57,8 +60,10 @@ class Tetris {
     private init(): void {
         this.resetBoard()
         this.setupEventListeners()
+        this.setupTouchControls()
         this.updateButtonState()
         this.draw()
+        this.drawNextPiece()
     }
 
     private resetBoard(): void {
@@ -76,20 +81,57 @@ class Tetris {
 
         document.getElementById('startBtn')!.addEventListener('click', () => this.startGame())
         document.getElementById('pauseBtn')!.addEventListener('click', () => this.togglePause())
-        document.getElementById('restartBtn')!.addEventListener('click', () => this.restartGame())
         document.getElementById('playAgainBtn')!.addEventListener('click', () => this.restartGame())
     }
 
+    private setupTouchControls(): void {
+        const touchControls = document.getElementById('touchControls')!
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        if (isTouch) touchControls.hidden = false
+
+        touchControls.querySelectorAll<HTMLButtonElement>('.tetris-touch__btn').forEach(btn => {
+            const action = btn.dataset.action as TouchAction | undefined
+            if (!action) return
+
+            btn.addEventListener('pointerdown', e => {
+                e.preventDefault()
+                this.handleTouchAction(action)
+            })
+        })
+    }
+
+    private handleTouchAction(action: TouchAction): void {
+        if (!this.gameStarted || this.gameOver || this.paused) return
+
+        switch (action) {
+            case 'left':
+                this.movePiece(-1, 0)
+                break
+            case 'right':
+                this.movePiece(1, 0)
+                break
+            case 'down':
+                this.movePiece(0, 1)
+                break
+            case 'rotate':
+                this.rotatePiece()
+                break
+            case 'drop':
+                this.hardDrop()
+                break
+        }
+    }
+
     private updateButtonState(): void {
-        const startBtn = document.getElementById('startBtn')!
-        const pauseBtn = document.getElementById('pauseBtn')!
+        const startBtn = document.getElementById('startBtn') as HTMLButtonElement
+        const pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement
 
         if (this.gameStarted && !this.gameOver) {
-            startBtn.classList.add('disabled')
-            pauseBtn.classList.remove('disabled')
+            startBtn.disabled = true
+            pauseBtn.disabled = false
         } else {
-            startBtn.classList.remove('disabled')
-            pauseBtn.classList.add('disabled')
+            startBtn.disabled = false
+            pauseBtn.disabled = true
         }
     }
 
@@ -164,7 +206,8 @@ class Tetris {
         this.updateDisplay()
         this.updateButtonState()
 
-        document.getElementById('gameOverModal')!.style.display = 'none'
+        const modal = document.getElementById('gameOverModal')!
+        modal.classList.remove('is-open')
         document.getElementById('pauseBtn')!.textContent = '暂停'
 
         this.draw()
@@ -336,10 +379,10 @@ class Tetris {
     }
 
     private draw(): void {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
         this.ctx.lineWidth = 1
 
         for (let row = 0; row <= this.ROWS; row++) {
@@ -403,7 +446,7 @@ class Tetris {
 
         if (ghostY === this.currentPiece.y) return
 
-        this.ctx.globalAlpha = 0.3
+        this.ctx.globalAlpha = 0.25
         for (let row = 0; row < this.currentPiece.shape.length; row++) {
             for (let col = 0; col < this.currentPiece.shape[row].length; col++) {
                 if (this.currentPiece.shape[row][col]) {
@@ -432,22 +475,31 @@ class Tetris {
     }
 
     private drawNextPiece(): void {
-        this.nextCtx.fillStyle = 'rgba(0, 0, 0, 0.5)'
-        this.nextCtx.fillRect(0, 0, this.nextCanvas.width, this.nextCanvas.height)
+        const w = this.nextCanvas.width
+        const h = this.nextCanvas.height
+
+        this.nextCtx.clearRect(0, 0, w, h)
 
         if (!this.nextPiece) return
 
         const blockSize = 20
-        const offsetX = (this.nextCanvas.width - this.nextPiece.shape[0].length * blockSize) / 2
-        const offsetY = (this.nextCanvas.height - this.nextPiece.shape.length * blockSize) / 2
+        const shapeW = this.nextPiece.shape[0].length * blockSize
+        const shapeH = this.nextPiece.shape.length * blockSize
+        const offsetX = (w - shapeW) / 2
+        const offsetY = (h - shapeH) / 2
 
         for (let row = 0; row < this.nextPiece.shape.length; row++) {
             for (let col = 0; col < this.nextPiece.shape[row].length; col++) {
                 if (this.nextPiece.shape[row][col]) {
                     const x = offsetX + col * blockSize
                     const y = offsetY + row * blockSize
+
                     this.nextCtx.fillStyle = this.nextPiece.color
                     this.nextCtx.fillRect(x, y, blockSize - 2, blockSize - 2)
+
+                    this.nextCtx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+                    this.nextCtx.fillRect(x, y, blockSize - 2, 2)
+                    this.nextCtx.fillRect(x, y, 2, blockSize - 2)
                 }
             }
         }
@@ -461,7 +513,7 @@ class Tetris {
 
     private showGameOver(): void {
         document.getElementById('finalScore')!.textContent = String(this.score)
-        document.getElementById('gameOverModal')!.style.display = 'block'
+        document.getElementById('gameOverModal')!.classList.add('is-open')
     }
 }
 
