@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>扫雷游戏</title>
-    <link rel="stylesheet" href="./minesweeper.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -17,7 +18,7 @@
                 <span class="info-label">剩余雷数</span>
                 <span class="info-value" id="mines-count">10</span>
             </div>
-            <button class="reset-btn" id="reset-btn">😊</button>
+            <button class="reset-btn" id="reset-btn">🙂</button>
             <div class="info-box">
                 <span class="info-label">时间</span>
                 <span class="info-value" id="timer">000</span>
@@ -44,6 +45,7 @@
         </div>
     </div>
 
-    <script src="./minesweeper.js"></script>
+    <script type="module" src="/src/games/minesweeper/main.ts"></script>
 </body>
+
 </html>
