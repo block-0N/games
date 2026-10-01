@@ -14,7 +14,6 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://block-0n.github.io/games">
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -53,103 +52,7 @@
             <p class="footer-sitemap"><a href="" rel="sitemap">站点地图</a></p>
         </div>
     </footer>
-    <script src="./data.js"></script>
-    <script>
-        const state = { diff: "all", cate: "all" };
-
-        function getCount(field, key) {
-            if (key === "all") return gameList.length;
-            return gameList.filter(g => g[field] === key).length;
-        }
-
-        function updateActive(containerSelector, dataKey, value) {
-            document.querySelectorAll(`${containerSelector} .btn`).forEach(btn => {
-                btn.classList.toggle("active", btn.dataset[dataKey] === value);
-            });
-        }
-
-        function renderFilterButtons() {
-            const diffGrid = document.getElementById("difficultyGrid");
-            diffGrid.innerHTML = "";
-            difficulties.forEach(d => {
-                const btn = document.createElement("button");
-                btn.className = "btn" + (d.type ? " btn-type" + d.type : "");
-                if (d.key === state.diff) btn.classList.add("active");
-                btn.dataset.diff = d.key;
-                btn.innerHTML = `<div>${getCount("difficulty", d.key)}</div><div>${d.label}</div>`;
-                btn.addEventListener("click", () => {
-                    state.diff = d.key;
-                    updateActive(".difficulty-card", "diff", state.diff);
-                    renderGames();
-                });
-                diffGrid.appendChild(btn);
-            });
-
-            const cateGrid = document.getElementById("categoryGrid");
-            cateGrid.innerHTML = "";
-            categories.forEach(c => {
-                const btn = document.createElement("button");
-                btn.className = "btn" + (c.type ? " btn-type" + c.type : "");
-                if (c.key === state.cate) btn.classList.add("active");
-                btn.dataset.cate = c.key;
-                btn.innerHTML = `<div>${getCount("category", c.key)}</div><div>${c.label}</div>`;
-                btn.addEventListener("click", () => {
-                    state.cate = c.key;
-                    updateActive(".category-card", "cate", state.cate);
-                    renderGames();
-                });
-                cateGrid.appendChild(btn);
-            });
-        }
-
-        function renderGames() {
-            const grid = document.querySelector(".game-grid");
-            const filtered = gameList.filter(g =>
-                (state.diff === "all" || g.difficulty === state.diff) &&
-                (state.cate === "all" || g.category === state.cate)
-            );
-            grid.innerHTML = "";
-            if (!filtered.length) {
-                grid.innerHTML = `<div class="empty-tip">暂无匹配的小游戏，换个筛选条件试试</div>`;
-                return;
-            }
-            const fragment = document.createDocumentFragment();
-            filtered.forEach(game => {
-                const a = document.createElement("a");
-                a.className = "game-item";
-                a.href = game.link;
-                a.target = "_blank";
-                a.rel = "noopener noreferrer";
-                a.title = `${game.name} - 免费在线玩`;
-
-                const cover = document.createElement("div");
-                cover.className = "game-cover-box";
-                cover.style.setProperty("--cover-color", game.color);
-                const emoji = document.createElement("span");
-                emoji.className = "game-cover-emoji";
-                emoji.textContent = game.emoji;
-                emoji.setAttribute("aria-hidden", "true");
-                cover.appendChild(emoji);
-
-                const textWrap = document.createElement("div");
-                textWrap.className = "game-text";
-                const nameP = document.createElement("p");
-                nameP.className = "game-name";
-                nameP.textContent = game.name;
-                textWrap.appendChild(nameP);
-
-                a.appendChild(cover);
-                a.appendChild(textWrap);
-                fragment.appendChild(a);
-            });
-            grid.appendChild(fragment);
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            renderFilterButtons();
-            renderGames();
-        });
-    </script>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 
 </html>
