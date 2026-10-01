@@ -14,7 +14,8 @@ export default defineConfig({
                 minesweeper: fileURLToPath(new URL('./minesweeper.html', import.meta.url)),
                 sudoku: fileURLToPath(new URL('./sudoku.html', import.meta.url)),
                 tetris: fileURLToPath(new URL('./tetris.html', import.meta.url)),
-                typing: fileURLToPath(new URL('./typing-game.html', import.meta.url))
+                typing: fileURLToPath(new URL('./typing-game.html', import.meta.url)),
+                mc2d: fileURLToPath(new URL('./mc2d.html', import.meta.url))
             }
         }
     }

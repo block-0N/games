@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#87ceeb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#2a3a4a" media="(prefers-color-scheme: dark)">
+    <title>MC2D</title>
+</head>
+
+<body>
+    <div class="mc2d-app">
+        <header class="mc2d-hud">
+            <div class="mc2d-hud__row">
+                <span class="mc2d-hud__label">生命</span>
+                <div class="mc2d-bar" id="health-bar"></div>
+            </div>
+            <div class="mc2d-hud__row">
+                <span class="mc2d-hud__label">饥饿</span>
+                <div class="mc2d-bar" id="hunger-bar"></div>
+            </div>
+            <div class="mc2d-hud__spacer"></div>
+            <button class="ui-btn" id="backpack-btn" title="打开背包 (E)">🎒 背包</button>
+            <button class="ui-btn" id="pause-btn">暂停</button>
+            <button class="ui-btn ui-btn--primary" id="restart-btn">重新开始</button>
+        </header>
+
+        <main class="mc2d-stage">
+            <canvas id="game-canvas"></canvas>
+        </main>
+
+        <footer class="mc2d-hotbar" id="hotbar">
+            <div class="mc2d-slot is-active">
+                <span class="mc2d-slot__key">1</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">2</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">3</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">4</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">5</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">6</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">7</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">8</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+            <div class="mc2d-slot">
+                <span class="mc2d-slot__key">9</span>
+                <span class="mc2d-slot__icon"></span>
+                <span class="mc2d-slot__count"></span>
+            </div>
+        </footer>
+    </div>
+
+    <div class="mc2d-backpack" id="backpack-modal">
+        <div class="mc2d-backpack__panel">
+            <header class="mc2d-backpack__header">
+                <h2 class="mc2d-backpack__title">背包</h2>
+                <button class="ui-btn" id="backpack-close">关闭</button>
+            </header>
+            <div class="mc2d-backpack__grid" id="backpack-grid">
+                <!-- 3x9 = 27 个格子，由 HTML 展开 -->
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+                <div class="mc2d-bp-slot"><span class="mc2d-slot__icon"></span><span class="mc2d-slot__count"></span>
+                </div>
+            </div>
+            <p class="mc2d-backpack__hint">点击两个格子交换物品 · 按 E 或 Esc 关闭</p>
+        </div>
+    </div>
+
+    <div class="mc2d-game-over" id="game-over-modal">
+        <div class="mc2d-game-over__panel">
+            <h2 class="mc2d-game-over__title">你倒下了</h2>
+            <p class="mc2d-game-over__desc">重新开始一局吧</p>
+            <button class="ui-btn ui-btn--primary" id="play-again-btn">再来一次</button>
+        </div>
+    </div>
+
+    <script type="module" src="/src/games/mc2d/main.ts"></script>
+</body>
+
+</html>

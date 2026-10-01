@@ -25,7 +25,7 @@ export const gameList: Game[] = [
     { name: '数独', link: `${base}sudoku.html`, emoji: '🧩', color: '#8b5cf6', difficulty: 'mid', category: 'logic' },
     { name: '打字练习', link: `${base}typing-game.html`, emoji: '⌨️', color: '#10b981', difficulty: 'easy', category: 'rea' },
     { name: '俄罗斯方块', link: `${base}tetris.html`, emoji: '🧱', color: '#ef4444', difficulty: 'easy', category: 'fun' },
-    { name: '我的世界', link: `${base}MC3D.html`, emoji: '⛏️', color: '#22c55e', difficulty: 'hard', category: 'fun' },
+    { name: '我的世界', link: `${base}mc2d.html`, emoji: '⛏️', color: '#22c55e', difficulty: 'hard', category: 'fun' },
     { name: '贪吃蛇', link: 'https://gallery.selfboot.cn/zh/games/snake', emoji: '🐍', color: '#16a34a', difficulty: 'mid', category: 'fun' },
     { name: '推箱子', link: 'https://gallery.selfboot.cn/zh/games/sokoban', emoji: '📦', color: '#a16207', difficulty: 'mid', category: 'move' },
     { name: '数字华容道', link: 'https://gallery.selfboot.cn/zh/games/sliding', emoji: '🔀', color: '#0ea5e9', difficulty: 'mid', category: 'move' },
