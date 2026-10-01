@@ -1,0 +1,3438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素世界 - 终局之战</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            user-select: none;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+        }
+
+        #crosshair::before {
+            top: 9px;
+            left: 0;
+            width: 20px;
+            height: 2px;
+        }
+
+        #crosshair::after {
+            top: 0;
+            left: 9px;
+            width: 2px;
+            height: 20px;
+        }
+
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        #instructions {
+            text-align: center;
+        }
+
+        .title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .controls-info {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #ddd;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        /* 左上角调试信息面板 */
+        #debug-ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 1px 1px 0 #000;
+            font-family: monospace;
+            font-size: 14px;
+            display: none;
+        }
+
+        .debug-line {
+            margin: 2px 0;
+        }
+
+        #time-display {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+
+        #gamemode-display {
+            color: #00ffaa;
+            font-weight: bold;
+        }
+
+        /* 聊天与指令UI */
+        #chat-container {
+            position: absolute;
+            bottom: 85px;
+            left: 10px;
+            width: 400px;
+            display: none;
+            z-index: 100;
+            font-family: sans-serif;
+        }
+
+        #chat-history {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 0 #000;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        #chat-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid #555;
+            padding: 8px;
+            font-size: 16px;
+            outline: none;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+
+        #chat-input:focus {
+            border-color: #aaa;
+        }
+
+        /* 背包与快捷栏 UI */
+        #hotbar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px;
+            border: 3px solid #444;
+            border-radius: 4px;
+            z-index: 5;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            max-width: 90vw;
+            overflow-x: auto;
+        }
+
+        #hotbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .slot {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-top: 3px solid #373737;
+            border-left: 3px solid #373737;
+            border-bottom: 3px solid #fff;
+            border-right: 3px solid #fff;
+            background-color: #8b8b8b;
+            box-sizing: border-box;
+            background-size: 80%;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            image-rendering: pixelated;
+        }
+
+        .slot:hover {
+            background-color: #a0a0a0;
+        }
+
+        .slot::before {
+            content: attr(data-key);
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .slot::after {
+            content: attr(data-count);
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            color: white;
+            font-size: 14px;
+            font-family: monospace;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .slot[data-count="0"]::after,
+        .slot[data-count="1"]::after {
+            display: none;
+        }
+
+        .slot.active {
+            border: 3px solid #fff;
+            transform: scale(1.1);
+            background-color: #a0a0a0;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            z-index: 2;
+        }
+
+        #inventory-ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #c6c6c6;
+            padding: 20px;
+            border: 4px solid #555;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 20;
+            box-shadow: inset -4px -4px rgba(0, 0, 0, 0.3), inset 4px 4px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 0, 0, 0.8);
+            font-family: sans-serif;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .inv-section-title {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .inv-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+
+        .crafting-area {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .crafting-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            width: 100px;
+            transition: width 0.2s;
+        }
+
+        .crafting-grid.size-3 {
+            grid-template-columns: repeat(3, 1fr);
+            width: 152px;
+        }
+
+        .crafting-arrow {
+            font-size: 24px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        #dragged-icon {
+            position: fixed;
+            width: 48px;
+            height: 48px;
+            pointer-events: none;
+            background-size: 80%;
+            background-position: center;
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            z-index: 9999;
+            display: none;
+            transform: translate(-50%, -50%);
+        }
+
+        #dragged-icon::after {
+            content: attr(data-count);
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            color: white;
+            font-size: 14px;
+            font-family: monospace;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        #dragged-icon[data-count="0"]::after,
+        #dragged-icon[data-count="1"]::after {
+            display: none;
+        }
+
+        #hand-item {
+            position: absolute;
+            bottom: -30px;
+            right: -30px;
+            width: 350px;
+            height: 350px;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            transform-origin: bottom right;
+            transform: rotate(-15deg);
+            pointer-events: none;
+            z-index: 4;
+            display: none;
+            filter: drop-shadow(-5px 5px 5px rgba(0, 0, 0, 0.5));
+        }
+
+        /* 屏幕状态覆盖与特效 */
+        #status-bars {
+            position: absolute;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            width: 480px;
+            justify-content: space-between;
+            z-index: 5;
+            font-size: 20px;
+            letter-spacing: -2px;
+            text-shadow: 2px 2px 0 #000;
+            transition: opacity 0.2s;
+        }
+
+        #death-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(150, 0, 0, 0.6);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #death-screen h1 {
+            font-size: 64px;
+            text-shadow: 4px 4px 0 #000;
+            margin-bottom: 40px;
+        }
+
+        #respawn-btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            background-color: #8b8b8b;
+            color: white;
+            border: 4px solid #fff;
+            cursor: pointer;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        #respawn-btn:hover {
+            background-color: #a0a0a0;
+        }
+
+        #portal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: purple;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 6;
+            transition: opacity 0.1s;
+        }
+
+        #boss-bar-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            z-index: 5;
+            width: 600px;
+        }
+
+        #boss-name {
+            color: #ffaaff;
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 5px;
+        }
+
+        #boss-bar-bg {
+            width: 100%;
+            height: 20px;
+            background-color: #222;
+            border: 2px solid #000;
+        }
+
+        #boss-bar-fill {
+            width: 100%;
+            height: 100%;
+            background-color: #aa00aa;
+            transition: width 0.2s;
+        }
+
+        /* 游戏通关终末之诗屏幕 */
+        #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            z-index: 9999;
+            color: #55ffff;
+            font-family: monospace;
+            overflow: hidden;
+            padding-top: 100vh;
+        }
+
+        .credits-text {
+            font-size: 24px;
+            text-align: center;
+            line-height: 2;
+            text-shadow: 2px 2px 0 #000;
+            white-space: pre-wrap;
+            width: 80%;
+            max-width: 800px;
+        }
+
+        .win-title {
+            color: #ffff55;
+            font-size: 48px;
+            margin-bottom: 40px;
+            font-weight: bold;
+        }
+
+        /* 合成书 UI */
+        #recipe-book-ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #c6c6c6;
+            padding: 20px;
+            border: 4px solid #555;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 25;
+            box-shadow: inset -4px -4px rgba(0, 0, 0, 0.3), inset 4px 4px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 0, 0, 0.8);
+            font-family: sans-serif;
+            color: #333;
+            font-weight: bold;
+            width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #recipe-book-title {
+            font-size: 20px;
+            color: #3b8526;
+            text-align: center;
+            border-bottom: 3px solid #555;
+            padding-bottom: 10px;
+        }
+
+        #recipe-book-content {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .recipe-item {
+            background: #b5b5b5;
+            padding: 10px;
+            border: 2px solid #888;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .recipe-icon {
+            width: 40px;
+            height: 40px;
+            background-size: 80%;
+            background-position: center;
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+        }
+
+        .recipe-info {
+            flex: 1;
+        }
+
+        .recipe-name {
+            font-size: 14px;
+            color: #000;
+        }
+
+        .recipe-pattern {
+            font-size: 12px;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        #recipe-book-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #8b8b8b;
+            color: white;
+            border: 2px solid #fff;
+            padding: 5px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        #recipe-book-close:hover {
+            background: #a0a0a0;
+        }
+
+        /* 存档系统 UI */
+        #save-system-ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #c6c6c6;
+            padding: 20px;
+            border: 4px solid #555;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 30;
+            box-shadow: inset -4px -4px rgba(0, 0, 0, 0.3), inset 4px 4px rgba(255, 255, 255, 0.7), 0 0 20px rgba(0, 0, 0, 0.8);
+            font-family: sans-serif;
+            color: #333;
+            font-weight: bold;
+            width: 500px;
+        }
+
+        #save-system-title {
+            font-size: 20px;
+            color: #3b8526;
+            text-align: center;
+            border-bottom: 3px solid #555;
+            padding-bottom: 10px;
+        }
+
+        .save-btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .save-btn {
+            flex: 1;
+            padding: 10px;
+            background: #8b8b8b;
+            color: white;
+            border: 2px solid #fff;
+            cursor: pointer;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+            min-width: 120px;
+        }
+
+        .save-btn:hover {
+            background: #a0a0a0;
+        }
+
+        .save-btn:active {
+            background: #707070;
+        }
+
+        #save-system-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #8b8b8b;
+            color: white;
+            border: 2px solid #fff;
+            padding: 5px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        #save-system-close:hover {
+            background: #a0a0a0;
+        }
+
+        #save-message {
+            text-align: center;
+            color: #3b8526;
+            font-size: 14px;
+            min-height: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="crosshair"></div>
+    <div id="dragged-icon"></div>
+    <div id="hand-item"></div>
+    <div id="portal-overlay"></div>
+
+    <!-- 调试信息面板 -->
+    <div id="debug-ui">
+        <div id="fps-display" class="debug-line">FPS: 计算中...</div>
+        <div id="coords-display" class="debug-line">XYZ: 0.0 / 0.0 / 0.0</div>
+        <div id="biome-display" class="debug-line">Biome: Overworld</div>
+        <div id="time-display" class="debug-line">离黑夜: 计算中...</div>
+        <div id="gamemode-display" class="debug-line">模式: 生存 [按 T 输入指令]</div>
+    </div>
+
+    <!-- 聊天面板 -->
+    <div id="chat-container">
+        <div id="chat-history"></div>
+        <input type="text" id="chat-input" placeholder="输入指令 (如 /gamemode 0) 或聊天内容..." autocomplete="off">
+    </div>
+
+    <div id="boss-bar-container">
+        <div id="boss-name">Ender Dragon</div>
+        <div id="boss-bar-bg">
+            <div id="boss-bar-fill"></div>
+        </div>
+    </div>
+
+    <div id="status-bars">
+        <div id="health-bar">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</div>
+        <div id="hunger-bar">🍗🍗🍗🍗🍗🍗🍗🍗🍗🍗</div>
+    </div>
+
+    <div id="death-screen">
+        <h1>你死了！</h1>
+        <button id="respawn-btn">重生</button>
+    </div>
+
+    <div id="win-screen">
+        <div class="credits-text" id="credits-content">
+            <span class="win-title">Game Clear！恭喜通关！</span>
+
+            I see the player you mean.
+            X1aoZhe?
+            Yes. Take care. It has reached a higher level now.
+
+            感谢您游玩《像素世界 - 终局之战》
+            开发引擎：Vanilla JS + Three.js
+
+            在这个充满无限可能的世界中，
+            水晶破灭的爆炸，巨龙陨落的辉光，
+            见证了你真正的冒险。
+
+            ...
+            (按 ESC 或 空格键 跳过并坠落回主世界)
+        </div>
+    </div>
+
+    <div id="inventory-ui">
+        <div class="crafting-area">
+            <div>
+                <div class="inv-section-title" id="crafting-title">合成 (2x2)</div>
+                <div class="crafting-grid size-2" id="crafting-grid">
+                    <div class="slot" data-container="crafting" data-index="0"></div>
+                    <div class="slot" data-container="crafting" data-index="1"></div>
+                    <div class="slot" data-container="crafting" data-index="2" style="display:none;"></div>
+                    <div class="slot" data-container="crafting" data-index="3"></div>
+                    <div class="slot" data-container="crafting" data-index="4"></div>
+                    <div class="slot" data-container="crafting" data-index="5" style="display:none;"></div>
+                    <div class="slot" data-container="crafting" data-index="6" style="display:none;"></div>
+                    <div class="slot" data-container="crafting" data-index="7" style="display:none;"></div>
+                    <div class="slot" data-container="crafting" data-index="8" style="display:none;"></div>
+                </div>
+            </div>
+            <div class="crafting-arrow">➜</div>
+            <div>
+                <div class="inv-section-title">产出</div>
+                <div class="slot" id="crafting-output" data-container="output" data-index="0"></div>
+            </div>
+        </div>
+        <div>
+            <div class="inv-section-title">背包</div>
+            <div id="inventory-grid"></div>
+        </div>
+    </div>
+
+    <div id="recipe-book-ui">
+        <button id="recipe-book-close">关闭</button>
+        <div id="recipe-book-title">📗 合成配方书</div>
+        <div id="recipe-book-content"></div>
+    </div>
+
+    <div id="save-system-ui">
+        <button id="save-system-close">关闭</button>
+        <div id="save-system-title">💾 存档系统</div>
+        <div id="save-message"></div>
+
+        <!-- 存档槽位选择 -->
+        <div style="margin-bottom: 15px;">
+            <div style="font-size: 14px; margin-bottom: 8px; color: #555;">选择存档槽位：</div>
+            <div class="save-btn-group" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;">
+                <button class="save-btn" data-slot="1" id="slot-1">槽位 1</button>
+                <button class="save-btn" data-slot="2" id="slot-2">槽位 2</button>
+                <button class="save-btn" data-slot="3" id="slot-3">槽位 3</button>
+                <button class="save-btn" data-slot="4" id="slot-4">槽位 4</button>
+                <button class="save-btn" data-slot="5" id="slot-5">槽位 5</button>
+            </div>
+            <div id="slot-info" style="font-size: 12px; color: #888; margin-top: 5px; text-align: center;"></div>
+        </div>
+
+        <!-- 存档操作 -->
+        <div class="save-btn-group">
+            <button class="save-btn" id="btn-save-game">保存游戏</button>
+            <button class="save-btn" id="btn-load-game">读取存档</button>
+            <button class="save-btn" id="btn-delete-save">删除存档</button>
+        </div>
+
+        <!-- 文件操作 -->
+        <div style="margin-top: 10px;">
+            <div style="font-size: 12px; margin-bottom: 5px; color: #555;">文件操作：</div>
+            <div class="save-btn-group">
+                <button class="save-btn" id="btn-export-save">导出存档</button>
+                <button class="save-btn" id="btn-import-save">导入存档</button>
+            </div>
+        </div>
+
+        <div style="text-align: center; font-size: 12px; color: #555; margin-top: 10px;">
+            💡 使用存档编辑器工具来编辑存档文件<br>
+            🟢 绿色 = 浏览器存档（小型）<br>
+            🟠 橙色 = 文件存档（大型）<br>
+            ⚠️ 50MB+ 存档必须使用文件方式
+        </div>
+    </div>
+
+    <div id="hotbar"></div>
+
+    <div id="blocker">
+        <div id="instructions">
+            <div class="title">像素世界：终局之战</div>
+            <div style="font-size: 16px; color: #ffcc00; margin-bottom: 15px; text-shadow: 1px 1px 0 #000;">
+                开发者：Green_LeavesS X1aoZhe</div>
+            <div class="controls-info">
+                左键： 挖掘/攻击 &nbsp;&nbsp;|&nbsp;&nbsp; 右键： 放置/分拆物品/合成台/拉弓<br>
+                移动： W A S D &nbsp;&nbsp;|&nbsp;&nbsp; 跳跃/上浮： 空格键<br>
+                背包： E 键 &nbsp;&nbsp;|&nbsp;&nbsp; 控制台/指令： T 键<br><br>
+                <span style="color:#00ffaa;">生存更新：背包2x2合成受限！请放置并右键合成台开启3x3高级配方！</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "simplex-noise": "https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/dist/esm/simplex-noise.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { createNoise2D, createNoise3D } from 'simplex-noise';
+
+        // ==========================================
+        // 【控制变量】
+        // ==========================================
+        const chunkSize = 16;
+        const noise2D = createNoise2D();
+        const noise3D = createNoise3D();
+        let playerInvulnTimer = 0;
+        let gameStartTime = 0;
+        let isSpawnImmunity = true;
+        let highestY = 20;
+        let isFalling = false;
+        let actionType = '';
+        let actionTimer = 0;
+        let hungerTimer = 0;
+        let healTimer = 0;
+        let starveTimer = 0;
+        let isGameClear = false;
+        let winScroller = null;
+
+        let jumpPressed = false;
+        let shiftPressed = false;
+        let gameMode = 1; // 0 = Creative, 1 = Survival
+        let isFlying = false;
+        let isChatOpen = false;
+        let lastSpacePress = 0;
+        let craftingMode = 2; // 2 = 2x2, 3 = 3x3
+
+        // ==========================================
+        // 1. 全局数据字典 (加入新镐子)
+        // ==========================================
+        const ITEMS = {
+            grass: { type: 'block', hardness: 0.6, tool: 'none', tier: 0 },
+            dirt: { type: 'block', hardness: 0.5, tool: 'none', tier: 0 },
+            sand: { type: 'block', hardness: 0.5, tool: 'none', tier: 0 },
+            leaves: { type: 'block', hardness: 0.2, tool: 'none', tier: 0 },
+            tall_grass: { type: 'block', hardness: 0.05, tool: 'none', tier: 0 },
+            log: { type: 'block', hardness: 2.0, tool: 'none', tier: 0 },
+            planks: { type: 'block', hardness: 2.0, tool: 'none', tier: 0 },
+            stone: { type: 'block', hardness: 5.0, tool: 'pickaxe', tier: 1 },
+            coal_ore: { type: 'block', hardness: 6.0, tool: 'pickaxe', tier: 1 },
+            iron_ore: { type: 'block', hardness: 8.0, tool: 'pickaxe', tier: 2 },
+            gold_ore: { type: 'block', hardness: 10.0, tool: 'pickaxe', tier: 3 },
+            diamond_ore: { type: 'block', hardness: 12.0, tool: 'pickaxe', tier: 3 },
+            bedrock: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            water: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            lava: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+
+            // 新增功能方块
+            crafting_table: { type: 'block', hardness: 2.5, tool: 'none', tier: 0 },
+            end_rod: { type: 'block', hardness: 0.1, tool: 'none', tier: 0 },
+
+            // 第 16 - 20 阶段特有方块与物品
+            obsidian: { type: 'block', hardness: 50.0, tool: 'pickaxe', tier: 3 },
+            nether_portal: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            netherrack: { type: 'block', hardness: 0.4, tool: 'pickaxe', tier: 1 },
+            magma: { type: 'block', hardness: 0.5, tool: 'pickaxe', tier: 1 },
+            end_stone: { type: 'block', hardness: 3.0, tool: 'pickaxe', tier: 1 },
+            end_portal_frame_empty: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            end_portal_frame_filled: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            end_portal: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+            stone_brick: { type: 'block', hardness: 2.5, tool: 'pickaxe', tier: 1 },
+            return_portal: { type: 'block', hardness: Infinity, tool: 'none', tier: 0 },
+
+            wooden_pickaxe: { type: 'tool', toolType: 'pickaxe', tier: 1, power: 4 },
+            stone_pickaxe: { type: 'tool', toolType: 'pickaxe', tier: 2, power: 8 },
+            iron_pickaxe: { type: 'tool', toolType: 'pickaxe', tier: 3, power: 15 },
+            gold_pickaxe: { type: 'tool', toolType: 'pickaxe', tier: 3, power: 25 }, // 金镐挖掘极快
+            diamond_pickaxe: { type: 'tool', toolType: 'pickaxe', tier: 4, power: 30 }, // 钻石镐可以挖黑曜石
+            raw_porkchop: { type: 'food', hungerRestore: 6 },
+            rotten_flesh: { type: 'food', hungerRestore: 4 },
+
+            flint_and_steel: { type: 'item' },
+            ender_pearl: { type: 'item' },
+            blaze_powder: { type: 'item' },
+            ender_eye: { type: 'item' },
+            blaze_rod: { type: 'item' },
+            bow: { type: 'tool', toolType: 'bow', tier: 1, power: 8 },
+            arrow: { type: 'item' },
+            stick: { type: 'item' },
+            string: { type: 'item' },
+            flint: { type: 'item' }
+        };
+
+        const blockTypes = ['grass', 'dirt', 'stone', 'bedrock', 'log', 'leaves', 'tall_grass', 'sand', 'planks', 'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore',
+            'obsidian', 'nether_portal', 'netherrack', 'magma', 'end_stone', 'end_portal_frame_empty', 'end_portal_frame_filled', 'end_portal', 'stone_brick', 'return_portal', 'water', 'lava', 'crafting_table', 'end_rod'];
+        const itemTypes = ['wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe', 'gold_pickaxe', 'diamond_pickaxe', 'raw_porkchop', 'rotten_flesh', 'flint_and_steel', 'ender_pearl', 'blaze_powder', 'ender_eye', 'blaze_rod', 'bow', 'arrow', 'stick', 'string', 'flint'];
+        const allItemTypes = [...blockTypes, ...itemTypes];
+
+        // 物品中文名称映射
+        const ITEM_NAMES_CN = {
+            // 方块
+            'grass': '草方块', 'dirt': '泥土', 'stone': '石头', 'bedrock': '基岩', 'log': '原木',
+            'leaves': '树叶', 'tall_grass': '高草丛', 'sand': '沙子', 'planks': '木板', 'coal_ore': '煤矿',
+            'iron_ore': '铁矿', 'gold_ore': '金矿', 'diamond_ore': '钻石矿', 'obsidian': '黑曜石',
+            'nether_portal': '下界传送门', 'netherrack': '下界岩', 'magma': '岩浆块', 'end_stone': '末地石',
+            'end_portal_frame_empty': '末地传送门框架', 'end_portal_frame_filled': '末地传送门框架(已填充)',
+            'end_portal': '末地传送门', 'stone_brick': '石砖', 'return_portal': '返回传送门',
+            'water': '水', 'lava': '岩浆', 'crafting_table': '工作台', 'end_rod': '末地烛',
+            // 工具
+            'wooden_pickaxe': '木镐', 'stone_pickaxe': '石镐', 'iron_pickaxe': '铁镐',
+            'gold_pickaxe': '金镐', 'diamond_pickaxe': '钻石镐', 'bow': '弓',
+            // 物品
+            'raw_porkchop': '生猪排', 'rotten_flesh': '腐肉', 'flint_and_steel': '打火石',
+            'ender_pearl': '末影珍珠', 'blaze_powder': '烈焰粉', 'ender_eye': '末影之眼',
+            'blaze_rod': '烈焰棒', 'arrow': '箭', 'stick': '木棍', 'string': '线', 'flint': '燧石'
+        };
+
+        // 获取物品中文名称
+        function getItemNameCN(itemName) {
+            return ITEM_NAMES_CN[itemName] || itemName;
+        }
+
+        const maxBlocksPerType = {};
+        blockTypes.forEach(t => maxBlocksPerType[t] = 2000);
+        maxBlocksPerType.stone = 20000; maxBlocksPerType.netherrack = 20000; maxBlocksPerType.end_stone = 15000;
+        maxBlocksPerType.water = 25000; maxBlocksPerType.lava = 25000;
+
+        // ==========================================
+        // 2. 场景与多维度保存系统
+        // ==========================================
+        const dimensionState = {
+            overworld: { chunks: new Map(), worldBlocks: new Set(), entities: [], playerPos: null },
+            nether: { chunks: new Map(), worldBlocks: new Set(), entities: [], playerPos: null },
+            end: { chunks: new Map(), worldBlocks: new Set(), entities: [], playerPos: null }
+        };
+
+        let currentDimension = 'overworld';
+        let chunks = dimensionState.overworld.chunks;
+        let worldBlocks = dimensionState.overworld.worldBlocks;
+        let entities = dimensionState.overworld.entities;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); scene.fog = new THREE.Fog(0x87CEEB, 40, 80);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 20, 0);
+
+        const heldItemGroup = new THREE.Group(); heldItemGroup.position.set(0.4, -0.4, -0.6); camera.add(heldItemGroup); scene.add(camera);
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(window.devicePixelRatio); document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); scene.add(directionalLight);
+
+        const skyColors = { overworld: new THREE.Color(0x87CEEB), dusk: new THREE.Color(0xfd5e53), night: new THREE.Color(0x050510), nether: new THREE.Color(0x330000), end: new THREE.Color(0x0a0a1a) };
+        const skyCurrent = new THREE.Color();
+
+        function getBlock(x, y, z) {
+            const cx = Math.floor(x / chunkSize); const cz = Math.floor(z / chunkSize);
+            const chunk = chunks.get(`${cx},${cz}`);
+            if (!chunk) return null;
+            return chunk.blocks.get(`${x},${y},${z}`);
+        }
+
+        function setBlock(x, y, z, type) {
+            const cx = Math.floor(x / chunkSize); const cz = Math.floor(z / chunkSize);
+            const chunk = chunks.get(`${cx},${cz}`);
+            if (!chunk) return;
+            const key = `${x},${y},${z}`;
+
+            if (type === null) {
+                chunk.blocks.delete(key); worldBlocks.delete(key);
+            } else {
+                chunk.blocks.set(key, type);
+                if (type !== 'water' && type !== 'lava' && type !== 'tall_grass' && type !== 'end_portal_frame_empty') worldBlocks.add(key);
+            }
+            rebuildChunkMesh(chunk);
+        }
+
+        // ==========================================
+        // 3. 超级纹理生成器
+        // ==========================================
+        const itemPixels = {};
+
+        function createPixelTexture(type) {
+            const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
+            const ctx = canvas.getContext('2d'); const imgData = ctx.createImageData(16, 16); const data = imgData.data;
+
+            for (let i = 0; i < 256; i++) {
+                let r = 0, g = 0, b = 0, a = 255;
+                const x = i % 16; const y = Math.floor(i / 16);
+                let noise = (Math.random() - 0.5) * 30;
+
+                if (type === 'grass_top') { r = 85 + noise; g = 150 + noise; b = 45 + noise; } else if (type === 'dirt') { r = 110 + noise; g = 75 + noise; b = 40 + noise; } else if (type === 'stone' || type === 'stone_brick') { r = 120 + noise; g = 120 + noise; b = 120 + noise; if (type === 'stone_brick' && (x % 8 === 0 || y % 8 === 0)) { r *= 0.6; g *= 0.6; b *= 0.6; } } else if (type === 'bedrock') { noise = (Math.random() - 0.5) * 80; r = 50 + noise; g = 50 + noise; b = 50 + noise; }
+                else if (type === 'grass_side') { const isGrass = y < (4 + Math.random() * 2); if (isGrass) { r = 85 + noise; g = 150 + noise; b = 45 + noise; } else { r = 110 + noise; g = 75 + noise; b = 40 + noise; } }
+                else if (type === 'log_top') { const dist = Math.sqrt((x - 7.5) ** 2 + (y - 7.5) ** 2); if (dist > 7) { r = 70; g = 45; b = 20; } else if (Math.floor(dist) % 2 === 0) { r = 150 + noise; g = 110 + noise; b = 70 + noise; } else { r = 130 + noise; g = 90 + noise; b = 50 + noise; } }
+                else if (type === 'log_side') { noise = (Math.random() - 0.5) * 20; if (x % 3 === 0 || x % 5 === 0) { r = 70 + noise; g = 45 + noise; b = 20 + noise; } else { r = 90 + noise; g = 60 + noise; b = 30 + noise; } }
+                else if (type === 'leaves') { noise = (Math.random() - 0.5) * 40; if (Math.random() < 0.15) { a = 0; } else { r = 40 + noise; g = 120 + noise; b = 30 + noise; } }
+                else if (type === 'tall_grass') { a = 0; const blades = [{ bx: 3, h: 10 }, { bx: 7, h: 14 }, { bx: 11, h: 12 }, { bx: 14, h: 8 }]; for (let bld of blades) { if (Math.abs(x - bld.bx) <= 1 && y >= 16 - bld.h) { r = 60 + noise; g = 140 + noise; b = 40 + noise; a = 255; } } }
+                else if (type === 'sand') { noise = (Math.random() - 0.5) * 15; r = 210 + noise; g = 190 + noise; b = 130 + noise; } else if (type === 'planks') { noise = (Math.random() - 0.5) * 10; r = 160 + noise; g = 110 + noise; b = 60 + noise; if (y % 4 === 0 || x % 16 === 0) { r *= 0.8; g *= 0.8; b *= 0.8; } }
+                else if (type.endsWith('_ore')) { r = 120 + noise; g = 120 + noise; b = 120 + noise; if (Math.random() < 0.15) { if (type === 'coal_ore') { r = 30; g = 30; b = 30; } else if (type === 'iron_ore') { r = 220; g = 160; b = 110; } else if (type === 'gold_ore') { r = 255; g = 215; b = 0; } else if (type === 'diamond_ore') { r = 50; g = 220; b = 255; } } }
+                else if (type === 'obsidian') { noise = (Math.random() - 0.5) * 40; r = 20 + noise; g = 10 + noise; b = 30 + noise; if (Math.random() < 0.1) { r += 20; b += 30; } }
+                else if (type === 'nether_portal') { r = 160 + noise; g = 30 + noise; b = 220 + noise; a = 180; }
+                else if (type === 'netherrack') { noise = (Math.random() - 0.5) * 30; r = 120 + noise; g = 40 + noise; b = 40 + noise; if (Math.random() < 0.2) { r = 80; g = 20; b = 20; } }
+                else if (type === 'magma') { noise = (Math.random() - 0.5) * 50; r = 200 + noise; g = 80 + noise; b = 0; if (Math.random() < 0.1) { r = 255; g = 200; b = 0; } }
+                else if (type === 'water') { noise = (Math.random() - 0.5) * 20; r = 20; g = 100 + noise; b = 200 + noise; a = 150; }
+                else if (type === 'lava') { noise = (Math.random() - 0.5) * 40; r = 240 + noise; g = 80 + noise; b = 0; a = 230; if (Math.random() < 0.1) { r = 255; g = 200; b = 0; } }
+                else if (type === 'end_stone') { noise = (Math.random() - 0.5) * 20; r = 220 + noise; g = 220 + noise; b = 150 + noise; if (Math.random() < 0.1) { r = 150; g = 150; b = 100; } }
+                else if (type.startsWith('end_portal_frame')) { r = 80 + noise; g = 120 + noise; b = 100 + noise; if (type === 'end_portal_frame_filled' && x > 4 && x < 11 && y > 4 && y < 11) { r = 50; g = 255; b = 200; } }
+                else if (type === 'end_portal' || type === 'return_portal') { r = 5 + noise; g = 5 + noise; b = 5 + noise; if (Math.random() < 0.05) { r = 255; g = 255; b = 255; } }
+                // 新增方块：合成台、末地烛
+                else if (type === 'crafting_table_top') { r = 139; g = 69; b = 19; if (x % 5 === 0 || y % 5 === 0) { r = 100; g = 50; b = 10; } }
+                else if (type === 'crafting_table_side') { r = 160; g = 110; b = 60; if (y < 4 && x > 4 && x < 12) { r = 100; g = 100; b = 100; } if (x % 16 === 0) { r *= 0.8; g *= 0.8; } }
+                else if (type === 'end_rod') { a = 0; if (x >= 6 && x <= 9) { if (y >= 13) { r = 200; g = 100; b = 200; a = 255; } else { r = 255; g = 255; b = 255; a = 255; } } }
+
+                else if (type === 'flint_and_steel') { a = 0; if ((x == 10 || x == 11) && y > 5 && y < 12) { r = 200; g = 200; b = 200; a = 255; } if ((x > 3 && x < 8) && (y > 8 && y < 13)) { r = 80; g = 80; b = 80; a = 255; } }
+                else if (type === 'ender_pearl') { a = 0; const d = Math.sqrt((x - 7.5) ** 2 + (y - 7.5) ** 2); if (d < 6) { r = 30 + noise; g = 180 + noise; b = 150 + noise; a = 255; if (d < 2) { r = 100; g = 255; b = 200; } } }
+                else if (type === 'blaze_powder') { a = 0; if (Math.random() < 0.5 && x > 4 && x < 12 && y > 4 && y < 12) { r = 255; g = 150; b = 0; a = 255; } }
+                else if (type === 'ender_eye') { a = 0; const d = Math.sqrt((x - 7.5) ** 2 + (y - 7.5) ** 2); if (d < 6) { r = 150 + noise; g = 250 + noise; b = 80 + noise; a = 255; if (x > 6 && x < 9 && y > 4 && y < 11) { r = 0; g = 0; b = 0; } } }
+                else if (type === 'blaze_rod') { a = 0; if (x > 6 && x < 9 && y > 2 && y < 14) { r = 255; g = 150 + noise; b = 0; a = 255; if (x === 7) { r = 255; g = 220; b = 100; } } }
+                else if (type === 'bow') { a = 0; const d = Math.sqrt((x - 8) ** 2 + (y - 8) ** 2); if (d >= 5 && d <= 7 && x <= 8) { r = 139; g = 69; b = 19; a = 255; } if (x === 8 && y >= 2 && y <= 14) { r = 200; g = 200; b = 200; a = 255; } }
+                else if (type === 'arrow') { a = 0; if (x === y) { r = 139; g = 69; b = 19; a = 255; if (x > 11) { r = 150; g = 150; b = 150; } if (x < 4) { r = 255; g = 255; b = 255; } } }
+                // 新增物品：燧石、线、木棍
+                else if (type === 'flint') { a = 0; if (x > 4 && x < 12 && y > 4 && y < 12) { r = 40; g = 40; b = 40; a = 255; if (Math.random() < 0.2) r = g = b = 80; } }
+                else if (type === 'string') { a = 0; if (x > 3 && x < 12 && y > 3 && y < 12 && (x + y) % 3 === 0) { r = 255; g = 255; b = 255; a = 255; } }
+                else if (type === 'stick') { a = 0; if (x === y && x > 2 && x < 13) { r = 139; g = 69; b = 19; a = 255; } }
+
+                else if (type.endsWith('_pickaxe')) {
+                    a = 0; const isWood = type === 'wooden_pickaxe'; const isStone = type === 'stone_pickaxe'; const isIron = type === 'iron_pickaxe';
+                    const isGold = type === 'gold_pickaxe'; const isDiamond = type === 'diamond_pickaxe';
+                    const pattern = ["     11111      ", "  11122222111   ", " 1222111112221  ", " 1211   131121  ", " 11    131  11  ", "      131       ", "     131        ", "    131         ", "   131          ", "  131           ", " 131            ", " 11             ", "                ", "                ", "                ", "                "];
+                    const char = pattern[y][x];
+                    if (char === '1') { a = 255; r = 50; g = 50; b = 50; }
+                    else if (char === '2') {
+                        a = 255;
+                        if (isWood) { r = 150; g = 110; b = 70; }
+                        else if (isStone) { r = 150; g = 150; b = 150; }
+                        else if (isIron) { r = 230; g = 230; b = 230; }
+                        else if (isGold) { r = 255; g = 215; b = 0; }
+                        else if (isDiamond) { r = 50; g = 220; b = 255; }
+                    }
+                    else if (char === '3') { a = 255; r = 120; g = 80; b = 40; }
+                }
+                else if (type === 'raw_porkchop') { a = 0; if (x > 3 && x < 13 && y > 5 && y < 11) { a = 255; r = 220; g = 100; b = 100; if (x === 4 || x === 12 || y === 6 || y === 10) { r = 180; g = 50; b = 50; } if (x > 8 && y > 7) { r = 240; g = 200; b = 200; } } }
+                else if (type === 'rotten_flesh') { a = 0; if (x > 3 && x < 12 && y > 5 && y < 11) { a = 255; r = 120 + noise; g = 140 + noise; b = 80; if (Math.random() < 0.2) { r = 160; g = 50; b = 50; } if (x === 4 || x === 11 || y === 6 || y === 10) { r *= 0.7; g *= 0.7; b *= 0.7; } } }
+
+                const idx = i * 4; data[idx] = Math.max(0, Math.min(255, r)); data[idx + 1] = Math.max(0, Math.min(255, g)); data[idx + 2] = Math.max(0, Math.min(255, b)); data[idx + 3] = a;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            itemPixels[type] = new Uint8ClampedArray(imgData.data);
+
+            if (ITEMS[type] && ITEMS[type].type === 'block' && type !== 'leaves' && type !== 'tall_grass' && type !== 'nether_portal' && type !== 'water' && type !== 'lava' && type !== 'end_rod') {
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.strokeRect(0, 0, 16, 16);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas); texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter; texture.colorSpace = THREE.SRGBColorSpace;
+            texture.uiIcon = canvas.toDataURL('image/png'); return texture;
+        }
+
+        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const materials = {
+            grass: [new THREE.MeshLambertMaterial({ map: createPixelTexture('grass_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('grass_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('grass_top') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('dirt') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('grass_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('grass_side') })],
+            log: [new THREE.MeshLambertMaterial({ map: createPixelTexture('log_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('log_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('log_top') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('log_top') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('log_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('log_side') })],
+            crafting_table: [new THREE.MeshLambertMaterial({ map: createPixelTexture('crafting_table_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('crafting_table_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('crafting_table_top') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('planks') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('crafting_table_side') }), new THREE.MeshLambertMaterial({ map: createPixelTexture('crafting_table_side') })],
+            leaves: new THREE.MeshLambertMaterial({ map: createPixelTexture('leaves'), transparent: true, alphaTest: 0.1 }), tall_grass: new THREE.MeshLambertMaterial({ map: createPixelTexture('tall_grass'), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide }),
+            nether_portal: new THREE.MeshLambertMaterial({ map: createPixelTexture('nether_portal'), transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+            end_rod: new THREE.MeshLambertMaterial({ map: createPixelTexture('end_rod'), transparent: true, alphaTest: 0.1 }),
+            water: new THREE.MeshLambertMaterial({ map: createPixelTexture('water'), transparent: true, opacity: 0.6, depthWrite: false }),
+            lava: new THREE.MeshLambertMaterial({ map: createPixelTexture('lava'), transparent: true, opacity: 0.9 })
+        };
+        ['dirt', 'stone', 'bedrock', 'sand', 'planks', 'coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore', 'obsidian', 'netherrack', 'magma', 'end_stone', 'end_portal_frame_empty', 'end_portal_frame_filled', 'end_portal', 'stone_brick', 'return_portal'].forEach(k => {
+            if (!materials[k]) materials[k] = new THREE.MeshLambertMaterial({ map: createPixelTexture(k) });
+        });
+
+        const icons = {};
+        for (let key of allItemTypes) {
+            if (materials[key]) icons[key] = Array.isArray(materials[key]) ? materials[key][0].map.uiIcon : materials[key].map.uiIcon;
+            else icons[key] = createPixelTexture(key).uiIcon;
+        }
+
+        // ==========================================
+        // 4. UI与动态合成系统 (2x2 / 3x3)
+        // ==========================================
+        let currentHealth = 20; let currentHunger = 20; let isDead = false;
+        const healthBarEl = document.getElementById('health-bar'); const hungerBarEl = document.getElementById('hunger-bar'); const deathScreenEl = document.getElementById('death-screen');
+
+        function updateStatusUI() {
+            healthBarEl.innerHTML = ''; for (let i = 0; i < 10; i++) healthBarEl.innerHTML += (i < Math.ceil(currentHealth / 2)) ? '❤️' : '🖤';
+            hungerBarEl.innerHTML = ''; for (let i = 0; i < 10; i++) hungerBarEl.innerHTML += (i < Math.ceil(currentHunger / 2)) ? '🍗' : '🦴';
+            document.getElementById('status-bars').style.opacity = (gameMode === 0) ? '0' : '1';
+        }
+
+        function takeDamage(amount) {
+            if (isDead || playerInvulnTimer > 0 || gameMode === 0) return;
+            currentHealth -= amount; updateStatusUI(); playerInvulnTimer = 0.5;
+            const flash = document.createElement('div'); flash.style.position = 'absolute'; flash.style.top = '0'; flash.style.left = '0'; flash.style.width = '100%'; flash.style.height = '100%'; flash.style.backgroundColor = 'rgba(255, 0, 0, 0.4)'; flash.style.pointerEvents = 'none'; flash.style.zIndex = '90'; document.body.appendChild(flash); setTimeout(() => { if (flash.parentNode) document.body.removeChild(flash); }, 200);
+            if (currentHealth <= 0) { isDead = true; controls.unlock(); }
+        }
+
+        document.getElementById('respawn-btn').addEventListener('click', () => {
+            currentHealth = 20; currentHunger = 20; isDead = false; updateStatusUI(); deathScreenEl.style.display = 'none';
+            if (currentDimension !== 'overworld') switchDimension('overworld');
+            camera.position.set(0, 20, 0);
+            dimensionState.overworld.playerPos = camera.position.clone();
+            velocity.set(0, 0, 0); highestY = 20; isFalling = false; isFlying = false;
+            isSpawnImmunity = true; playerInvulnTimer = 2.0; gameStartTime = 0; jumpPressed = false; controls.lock();
+        });
+
+        function appendChat(msg) {
+            const hist = document.getElementById('chat-history'); const p = document.createElement('div'); p.innerText = msg; hist.appendChild(p); hist.scrollTop = hist.scrollHeight;
+        }
+
+        function handleCommand(cmd) {
+            appendChat(`> ${cmd}`);
+            const args = cmd.trim().split(' ');
+            const command = args[0].toLowerCase();
+
+            if (command === '/gamemode') {
+                if (args[1] === '0') { gameMode = 0; document.getElementById('gamemode-display').innerText = '模式: 创造 [双击空格飞行]'; appendChat('已切换到 创造模式'); updateStatusUI(); }
+                else if (args[1] === '1') { gameMode = 1; isFlying = false; document.getElementById('gamemode-display').innerText = '模式: 生存 [按 T 输入指令]'; appendChat('已切换到 生存模式'); updateStatusUI(); }
+                else { appendChat('用法: /gamemode <0|1> - 0=创造模式 1=生存模式'); }
+            }
+            else if (command === '/help') {
+                appendChat('══════════════════════════════════');
+                appendChat('📖 可用指令列表:');
+                appendChat('  /gamemode <0|1>   - 切换游戏模式 (0=创造 1=生存)');
+                appendChat('  /give <物品> [数量] - 给予物品 (如: /give stone 64)');
+                appendChat('  /recipebook       - 打开合成配方书 (查看所有物品)');
+                appendChat('  /save             - 打开存档系统 (多槽位存档)');
+                appendChat('  /clear            - 清空聊天记录');
+                appendChat('  /tp <x> <y> <z>   - 传送到指定坐标 (创造模式)');
+                appendChat('  /heal             - 恢复满血 (生存模式)');
+                appendChat('  /feed             - 恢复满饥饿值 (生存模式)');
+                appendChat('  /time             - 显示游戏信息');
+                appendChat('══════════════════════════════════');
+                appendChat('💡 常用物品示例:');
+                appendChat('  stone(石头) dirt(泥土) grass(草方块) log(原木)');
+                appendChat('  planks(木板) coal_ore(煤矿) iron_ore(铁矿)');
+                appendChat('  diamond_ore(钻石矿) obsidian(黑曜石) crafting_table(工作台)');
+                appendChat('══════════════════════════════════');
+                appendChat('⌨️ 提示: 按 Tab 键自动补全指令和物品名称');
+            }
+            else if (command === '/give') {
+                if (args.length < 2) {
+                    appendChat('用法: /give <物品> [数量]');
+                    appendChat('例如: /give stone 64 (给予64个石头)');
+                    return;
+                }
+                const itemName = args[1].toLowerCase();
+                const count = args[2] ? parseInt(args[2]) : 64;
+
+                // 查找匹配的物品
+                const matchedItem = allItemTypes.find(item => item.toLowerCase() === itemName);
+                if (matchedItem) {
+                    addBlockToInventory(matchedItem, count);
+                    renderInventoryUI();
+                    const itemNameCN = getItemNameCN(matchedItem);
+                    appendChat(`✅ 已给予 ${count} 个 ${itemNameCN} (${matchedItem})`);
+                } else {
+                    appendChat(`❌ 错误: 未找到物品 "${itemName}"`);
+                    appendChat(`💡 提示: 输入 /recipebook 查看所有可用物品`);
+                }
+            }
+            else if (command === '/recipebook') {
+                openRecipeBook();
+            }
+            else if (command === '/save') {
+                openSaveSystem();
+            }
+            else if (command === '/clear') {
+                const chatHistory = document.getElementById('chat-history');
+                chatHistory.innerHTML = '';
+                appendChat('聊天记录已清空');
+            }
+            else if (command === '/tp') {
+                if (gameMode !== 0) {
+                    appendChat('错误: /tp 指令只能在创造模式下使用！');
+                    return;
+                }
+                if (args.length < 4) {
+                    appendChat('用法: /tp <x> <y> <z>');
+                    return;
+                }
+                const x = parseFloat(args[1]);
+                const y = parseFloat(args[2]);
+                const z = parseFloat(args[3]);
+
+                if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                    appendChat('错误: 坐标必须是数字');
+                    return;
+                }
+
+                camera.position.set(x, y, z);
+                velocity.set(0, 0, 0);
+                highestY = y;
+                isFalling = false;
+                appendChat(`已传送到 (${x}, ${y}, ${z})`);
+            }
+            else if (command === '/heal') {
+                if (gameMode === 0) {
+                    appendChat('创造模式下不需要治疗');
+                    return;
+                }
+                currentHealth = 20;
+                updateStatusUI();
+                appendChat('生命值已恢复满');
+            }
+            else if (command === '/feed') {
+                if (gameMode === 0) {
+                    appendChat('创造模式下不需要进食');
+                    return;
+                }
+                currentHunger = 20;
+                updateStatusUI();
+                appendChat('饥饿值已恢复满');
+            }
+            else if (command === '/time') {
+                appendChat(`当前维度: ${currentDimension === 'overworld' ? '主世界' : currentDimension === 'nether' ? '下界' : '末地'}`);
+                appendChat(`当前坐标: ${Math.floor(camera.position.x)}, ${Math.floor(camera.position.y)}, ${Math.floor(camera.position.z)}`);
+                appendChat(`游戏模式: ${gameMode === 0 ? '创造模式' : '生存模式'}`);
+            }
+            else {
+                appendChat('未知指令。输入 /help 查看可用指令列表。');
+            }
+        }
+
+        // ==========================================
+        // 合成书系统
+        // ==========================================
+        const recipes = [
+            { name: '木板', output: 'planks', count: 4, pattern: '任意形状', ingredients: ['log'], mode: 2 },
+            { name: '木棍', output: 'stick', count: 4, pattern: '木板+木板', ingredients: ['planks', 'planks'], mode: 2 },
+            { name: '工作台', output: 'crafting_table', count: 1, pattern: '2x2 木板', ingredients: ['planks', 'planks', 'planks', 'planks'], mode: 2 },
+            { name: '箭', output: 'arrow', count: 4, pattern: '燧石+木棍', ingredients: ['flint', 'stick'], mode: 2 },
+            { name: '烈焰粉', output: 'blaze_powder', count: 2, pattern: '任意形状', ingredients: ['blaze_rod'], mode: 2 },
+            { name: '末影之眼', output: 'ender_eye', count: 1, pattern: '任意形状', ingredients: ['ender_pearl', 'blaze_powder'], mode: 2 },
+            { name: '打火石', output: 'flint_and_steel', count: 1, pattern: '任意形状', ingredients: ['iron_ore', 'flint'], mode: 2 },
+            { name: '木镐', output: 'wooden_pickaxe', count: 1, pattern: 'T形 (3x3)', ingredients: ['planks', 'planks', 'planks', 'stick'], mode: 3 },
+            { name: '石镐', output: 'stone_pickaxe', count: 1, pattern: 'T形 (3x3)', ingredients: ['stone', 'stone', 'stone', 'stick'], mode: 3 },
+            { name: '铁镐', output: 'iron_pickaxe', count: 1, pattern: 'T形 (3x3)', ingredients: ['iron_ore', 'iron_ore', 'iron_ore', 'stick'], mode: 3 },
+            { name: '金镐', output: 'gold_pickaxe', count: 1, pattern: 'T形 (3x3)', ingredients: ['gold_ore', 'gold_ore', 'gold_ore', 'stick'], mode: 3 },
+            { name: '钻石镐', output: 'diamond_pickaxe', count: 1, pattern: 'T形 (3x3)', ingredients: ['diamond_ore', 'diamond_ore', 'diamond_ore', 'stick'], mode: 3 },
+            { name: '弓', output: 'bow', count: 1, pattern: '弓形 (3x3)', ingredients: ['string', 'string', 'string', 'stick', 'stick'], mode: 3 }
+        ];
+
+        function openRecipeBook() {
+            const recipeBook = document.getElementById('recipe-book-ui');
+            const content = document.getElementById('recipe-book-content');
+            content.innerHTML = '';
+
+            // 显示所有配方
+            recipes.forEach(recipe => {
+                const item = document.createElement('div');
+                item.className = 'recipe-item';
+
+                const icon = document.createElement('div');
+                icon.className = 'recipe-icon';
+                icon.style.backgroundImage = `url(${icons[recipe.output]})`;
+
+                const info = document.createElement('div');
+                info.className = 'recipe-info';
+
+                const name = document.createElement('div');
+                name.className = 'recipe-name';
+                name.textContent = `${recipe.name} x${recipe.count}`;
+
+                const pattern = document.createElement('div');
+                pattern.className = 'recipe-pattern';
+                pattern.textContent = `配方: ${recipe.ingredients.join(' + ')} | ${recipe.mode === 2 ? '2x2' : '3x3'}合成`;
+
+                info.appendChild(name);
+                info.appendChild(pattern);
+                item.appendChild(icon);
+                item.appendChild(info);
+                content.appendChild(item);
+            });
+
+            // 显示所有可给予的物品列表
+            const separator = document.createElement('div');
+            separator.style.gridColumn = '1 / -1';
+            separator.style.borderTop = '2px solid #555';
+            separator.style.marginTop = '10px';
+            separator.style.paddingTop = '10px';
+            separator.textContent = '所有可用物品 (用于 /give 指令):';
+            content.appendChild(separator);
+
+            const itemTypesDiv = document.createElement('div');
+            itemTypesDiv.style.gridColumn = '1 / -1';
+            itemTypesDiv.style.fontSize = '12px';
+            itemTypesDiv.style.color = '#555';
+            itemTypesDiv.style.lineHeight = '1.8';
+            itemTypesDiv.style.maxHeight = '200px';
+            itemTypesDiv.style.overflowY = 'auto';
+
+            // 显示格式: 英文名 (中文名)
+            const itemsWithCN = allItemTypes.map(item => {
+                const cnName = getItemNameCN(item);
+                return `${item} (${cnName})`;
+            });
+            itemTypesDiv.textContent = itemsWithCN.join(', ');
+
+            content.appendChild(itemTypesDiv);
+
+            recipeBook.style.display = 'flex';
+            controls.unlock();
+        }
+
+        document.getElementById('recipe-book-close').addEventListener('click', () => {
+            document.getElementById('recipe-book-ui').style.display = 'none';
+            if (!isInventoryOpen) controls.lock();
+        });
+
+        // ==========================================
+        // 存档系统 (三重加密 + 多槽位)
+        // ==========================================
+        const SAVE_BASE_KEY = 'MCAI_SaveData';
+        const SLOT_META_KEY = 'MCAI_SaveSlots';
+        let currentSaveSlot = 1;
+        const MAX_SLOTS = 5;
+        const ENCRYPTION_KEY1 = 'MCAI_LAYER1_X1aoZhe_2024';
+        const ENCRYPTION_KEY2 = 'MCAI_LAYER2_Green_LeavesS';
+        const ENCRYPTION_KEY3 = 'MCAI_LAYER3_FINAL_SECRET';
+
+        // 获取当前槽位的存档键
+        function getSaveKey(slot) {
+            return `${SAVE_BASE_KEY}_Slot${slot}`;
+        }
+
+        // 获取槽位元数据
+        function getSlotMetadata() {
+            try {
+                const metaStr = localStorage.getItem(SLOT_META_KEY);
+                return metaStr ? JSON.parse(metaStr) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        // 保存槽位元数据
+        function saveSlotMetadata(meta) {
+            try {
+                localStorage.setItem(SLOT_META_KEY, JSON.stringify(meta));
+            } catch (e) {
+                console.error('保存元数据失败:', e);
+            }
+        }
+
+        // 更新槽位信息
+        function updateSlotInfo(slot, info) {
+            const meta = getSlotMetadata();
+            meta[slot] = info;
+            saveSlotMetadata(meta);
+            updateSlotUI();
+        }
+
+        // 更新槽位 UI 显示
+        function updateSlotUI() {
+            const meta = getSlotMetadata();
+            const slotInfo = document.getElementById('slot-info');
+
+            for (let i = 1; i <= MAX_SLOTS; i++) {
+                const btn = document.getElementById(`slot-${i}`);
+                const slotMeta = meta[i];
+
+                if (slotMeta && slotMeta.hasSave) {
+                    if (slotMeta.storageType === 'file') {
+                        // 文件存档 - 橙色
+                        btn.style.background = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                        btn.textContent = `槽位 ${i} `;
+                    } else {
+                        // localStorage 存档 - 绿色
+                        btn.style.background = 'linear-gradient(135deg, #2ecc71, #27ae60)';
+                        btn.textContent = `槽位 ${i} `;
+                    }
+                } else {
+                    btn.style.background = 'linear-gradient(135deg, #0f3460, #16213e)';
+                    btn.textContent = `槽位 ${i}`;
+                }
+
+                if (i === currentSaveSlot) {
+                    btn.style.border = '2px solid #e94560';
+                    btn.style.boxShadow = '0 0 10px rgba(233, 69, 96, 0.5)';
+                } else {
+                    btn.style.border = '1px solid #0f3460';
+                    btn.style.boxShadow = 'none';
+                }
+            }
+
+            // 显示当前槽位信息
+            const currentMeta = meta[currentSaveSlot];
+            if (currentMeta && currentMeta.hasSave) {
+                const date = new Date(currentMeta.timestamp);
+                const sizeInfo = currentMeta.sizeKB ? ` | 大小: ${currentMeta.sizeKB} KB` : '';
+                const storageInfo = currentMeta.storageType === 'file' ? ' | 📁 文件存档' : ' | 💾 浏览器存档';
+                slotInfo.textContent = `保存时间: ${date.toLocaleString()} | 模式: ${currentMeta.gameMode === 0 ? '创造' : '生存'}${sizeInfo}${storageInfo}`;
+            } else {
+                slotInfo.textContent = '当前槽位为空';
+            }
+        }
+
+        // 三重加密函数
+        function encryptData(data) {
+            let jsonString = JSON.stringify(data);
+
+            // 第一层加密：XOR + Base64
+            let layer1 = '';
+            for (let i = 0; i < jsonString.length; i++) {
+                layer1 += String.fromCharCode(jsonString.charCodeAt(i) ^ ENCRYPTION_KEY1.charCodeAt(i % ENCRYPTION_KEY1.length));
+            }
+            layer1 = btoa(layer1);
+
+            // 第二层加密：字符位移 + Base64
+            let layer2 = '';
+            for (let i = 0; i < layer1.length; i++) {
+                layer2 += String.fromCharCode((layer1.charCodeAt(i) + 7) % 256);
+            }
+            layer2 = btoa(layer2);
+
+            // 第三层加密：XOR + 反转 + Base64
+            let layer3 = '';
+            for (let i = 0; i < layer2.length; i++) {
+                layer3 += String.fromCharCode(layer2.charCodeAt(i) ^ ENCRYPTION_KEY3.charCodeAt(i % ENCRYPTION_KEY3.length));
+            }
+            layer3 = layer3.split('').reverse().join('');
+            return btoa(layer3);
+        }
+
+        // 三重解密函数
+        function decryptData(encrypted) {
+            try {
+                // 第三层解密
+                let layer3 = atob(encrypted);
+                layer3 = layer3.split('').reverse().join('');
+                let layer2 = '';
+                for (let i = 0; i < layer3.length; i++) {
+                    layer2 += String.fromCharCode(layer3.charCodeAt(i) ^ ENCRYPTION_KEY3.charCodeAt(i % ENCRYPTION_KEY3.length));
+                }
+
+                // 第二层解密
+                layer2 = atob(layer2);
+                let layer1 = '';
+                for (let i = 0; i < layer2.length; i++) {
+                    layer1 += String.fromCharCode((layer2.charCodeAt(i) - 7 + 256) % 256);
+                }
+
+                // 第一层解密
+                layer1 = atob(layer1);
+                let decrypted = '';
+                for (let i = 0; i < layer1.length; i++) {
+                    decrypted += String.fromCharCode(layer1.charCodeAt(i) ^ ENCRYPTION_KEY1.charCodeAt(i % ENCRYPTION_KEY1.length));
+                }
+
+                return JSON.parse(decrypted);
+            } catch (e) {
+                console.error('解密失败:', e);
+                return null;
+            }
+        }
+
+        // 序列化存档数据
+        function serializeSaveData() {
+            const saveData = {
+                version: '1.0',
+                timestamp: Date.now(),
+                gameMode: gameMode,
+                currentDimension: currentDimension,
+                playerPosition: {
+                    x: camera.position.x,
+                    y: camera.position.y,
+                    z: camera.position.z
+                },
+                playerVelocity: {
+                    x: velocity.x,
+                    y: velocity.y,
+                    z: velocity.z
+                },
+                currentHealth: currentHealth,
+                currentHunger: currentHunger,
+                isFlying: isFlying,
+                highestY: highestY,
+                inventory: {
+                    hotbar: invState.hotbar,
+                    main: invState.main
+                },
+                dimensions: {
+                    overworld: serializeDimension('overworld'),
+                    nether: serializeDimension('nether'),
+                    end: serializeDimension('end')
+                }
+            };
+            return saveData;
+        }
+
+        // 序列化单个维度（优化版）
+        function serializeDimension(dimName) {
+            const dim = dimensionState[dimName];
+            const chunksData = {};
+
+            dim.chunks.forEach((chunk, key) => {
+                // 只保存有方块的区块
+                if (chunk.blocks.size > 0) {
+                    const blockArray = [];
+                    chunk.blocks.forEach((blockType, blockKey) => {
+                        // 使用更紧凑的格式: [x,y,z,type]
+                        const [x, y, z] = blockKey.split(',').map(Number);
+                        blockArray.push([x, y, z, blockType]);
+                    });
+
+                    chunksData[key] = {
+                        blocks: blockArray, // 使用数组而不是 Map.entries()
+                        count: blockArray.length // 添加数量统计
+                    };
+                }
+            });
+
+            return {
+                chunks: chunksData,
+                worldBlocks: Array.from(dim.worldBlocks), // 保持兼容性
+                entities: serializeEntities(dim.entities),
+                playerPos: dim.playerPos ? { x: dim.playerPos.x, y: dim.playerPos.y, z: dim.playerPos.z } : null
+            };
+        }
+
+        // 序列化实体
+        function serializeEntities(entities) {
+            return entities.map(e => ({
+                type: e.type,
+                hp: e.hp,
+                position: { x: e.mesh.position.x, y: e.mesh.position.y, z: e.mesh.position.z },
+                state: e.state || null,
+                timer: e.timer || 0
+            }));
+        }
+
+        // 反序列化存档数据
+        function deserializeSaveData(saveData) {
+            if (!saveData || !saveData.version) {
+                showSaveMessage('存档格式无效！');
+                return false;
+            }
+
+            // 恢复游戏状态
+            gameMode = saveData.gameMode;
+            currentDimension = saveData.currentDimension;
+            camera.position.set(saveData.playerPosition.x, saveData.playerPosition.y, saveData.playerPosition.z);
+            // 重置速度，避免导入后自动移动或起飞
+            velocity.set(0, 0, 0);
+            currentHealth = saveData.currentHealth;
+            currentHunger = saveData.currentHunger;
+            isFlying = saveData.isFlying;
+            highestY = saveData.highestY;
+
+            // 恢复背包
+            invState.hotbar = saveData.inventory.hotbar;
+            invState.main = saveData.inventory.main;
+
+            // 恢复维度数据
+            deserializeDimension('overworld', saveData.dimensions.overworld);
+            deserializeDimension('nether', saveData.dimensions.nether);
+            deserializeDimension('end', saveData.dimensions.end);
+
+            // 切换到当前维度
+            chunks = dimensionState[currentDimension].chunks;
+            worldBlocks = dimensionState[currentDimension].worldBlocks;
+            entities = dimensionState[currentDimension].entities;
+
+            updateStatusUI();
+            renderInventoryUI();
+            return true;
+        }
+
+        // 反序列化单个维度
+        function deserializeDimension(dimName, dimData) {
+            const dim = dimensionState[dimName];
+
+            // 清除现有数据
+            dim.chunks.forEach((chunk, key) => {
+                if (chunk.mesh) {
+                    scene.remove(chunk.mesh);
+                    chunk.mesh.geometry.dispose();
+                }
+            });
+            dim.chunks.clear();
+            dim.worldBlocks.clear();
+
+            // 恢复区块（支持新旧格式）
+            for (const [key, chunkData] of Object.entries(dimData.chunks)) {
+                const chunk = {
+                    blocks: new Map(),
+                    mesh: null
+                };
+
+                // 新格式: [[x,y,z,type], ...]
+                if (Array.isArray(chunkData.blocks) && chunkData.blocks.length > 0 && Array.isArray(chunkData.blocks[0])) {
+                    chunkData.blocks.forEach(([x, y, z, type]) => {
+                        chunk.blocks.set(`${x},${y},${z}`, type);
+                    });
+                }
+                // 旧格式: [['x,y,z', type], ...]
+                else if (Array.isArray(chunkData.blocks)) {
+                    chunk.blocks.forEach(([blockKey, type]) => {
+                        chunk.blocks.set(blockKey, type);
+                    });
+                }
+
+                dim.chunks.set(key, chunk);
+
+                // 只重建有方块的区块
+                if (chunk.blocks.size > 0) {
+                    rebuildChunkMesh(chunk);
+                }
+            }
+
+            // 恢复世界方块
+            dimData.worldBlocks.forEach(block => dim.worldBlocks.add(block));
+
+            // 恢复实体
+            dim.entities = [];
+            dimData.entities.forEach(e => {
+                if (e.type === 'pig') {
+                    spawnPig(e.position.x, e.position.z, e.position.y - 2);
+                } else if (e.type === 'zombie') {
+                    spawnZombie(e.position.x, e.position.z, e.position.y - 2);
+                }
+                // 可以添加更多实体类型
+            });
+
+            // 恢复玩家位置
+            if (dimData.playerPos) {
+                dim.playerPos = new THREE.Vector3(dimData.playerPos.x, dimData.playerPos.y, dimData.playerPos.z);
+            }
+        }
+
+        // 保存游戏到本地存储
+        function saveGame() {
+            try {
+                const saveData = serializeSaveData();
+                const encrypted = encryptData(saveData);
+                const fileSizeKB = (encrypted.length / 1024).toFixed(2);
+
+                // 检查文件大小
+                if (encrypted.length > 1024 * 1024) { // 大于 1MB
+                    // 大型存档，直接导出为文件
+                    if (confirm(`存档大小约为 ${fileSizeKB} KB，无法保存到浏览器。\n\n是否立即导出为文件？`)) {
+                        exportSaveToSlot(encrypted);
+                    }
+                } else {
+                    // 小型存档，尝试保存到 localStorage
+                    const saveKey = getSaveKey(currentSaveSlot);
+                    try {
+                        localStorage.setItem(saveKey, encrypted);
+
+                        // 更新槽位元数据
+                        updateSlotInfo(currentSaveSlot, {
+                            hasSave: true,
+                            timestamp: Date.now(),
+                            gameMode: saveData.gameMode,
+                            playerName: saveData.playerName || 'Player',
+                            sizeKB: fileSizeKB,
+                            storageType: 'localStorage'
+                        });
+
+                        showSaveMessage(`✅ 存档已保存到槽位 ${currentSaveSlot}！(${fileSizeKB} KB)`);
+                        appendChat(`存档已保存到槽位 ${currentSaveSlot}！(${fileSizeKB} KB)`);
+                    } catch (storageError) {
+                        // localStorage 配额超限，导出为文件
+                        console.error('本地存储失败:', storageError);
+                        showSaveMessage('⚠️ 浏览器存储空间不足，将导出为文件');
+
+                        setTimeout(() => {
+                            if (confirm('浏览器存储空间已满！\n\n是否立即导出存档为文件？')) {
+                                exportSaveToSlot(encrypted);
+                            }
+                        }, 100);
+                    }
+                }
+            } catch (e) {
+                console.error('保存失败:', e);
+                showSaveMessage('❌ 保存失败：' + e.message);
+            }
+        }
+
+        // 导出到指定槽位（作为文件）
+        function exportSaveToSlot(encrypted = null) {
+            try {
+                const saveData = encrypted || encryptData(serializeSaveData());
+                const fileSizeKB = (saveData.length / 1024).toFixed(2);
+                const blob = new Blob([saveData], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+                a.download = `MCAI_Save_Slot${currentSaveSlot}_${timestamp}.mca`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                // 更新槽位元数据（标记为文件存档）
+                updateSlotInfo(currentSaveSlot, {
+                    hasSave: true,
+                    timestamp: Date.now(),
+                    gameMode: serializeSaveData().gameMode,
+                    playerName: serializeSaveData().playerName || 'Player',
+                    sizeKB: fileSizeKB,
+                    storageType: 'file'
+                });
+
+                showSaveMessage(`✅ 存档已导出到文件 (槽位 ${currentSaveSlot})！(${fileSizeKB} KB)`);
+                appendChat(`存档已导出到文件，请保存到安全位置`);
+            } catch (e) {
+                console.error('导出失败:', e);
+                showSaveMessage('❌ 导出失败：' + e.message);
+            }
+        }
+
+        // 从本地存储读取存档
+        function loadGame() {
+            const meta = getSlotMetadata()[currentSaveSlot];
+
+            if (!meta || !meta.hasSave) {
+                showSaveMessage(`❌ 槽位 ${currentSaveSlot} 没有存档！`);
+                return;
+            }
+
+            // 如果是文件存档，提示用户导入
+            if (meta.storageType === 'file') {
+                if (confirm(`槽位 ${currentSaveSlot} 的存档已导出为文件。\n\n请选择对应的 .mca 文件来加载存档。`)) {
+                    importSave();
+                }
+                return;
+            }
+
+            // 从 localStorage 读取
+            try {
+                const saveKey = getSaveKey(currentSaveSlot);
+                const encrypted = localStorage.getItem(saveKey);
+                if (!encrypted) {
+                    showSaveMessage(`❌ 槽位 ${currentSaveSlot} 的存档文件丢失！`);
+                    return;
+                }
+                const saveData = decryptData(encrypted);
+                if (saveData && deserializeSaveData(saveData)) {
+                    showSaveMessage(`✅ 已从槽位 ${currentSaveSlot} 读取存档！`);
+                    appendChat(`已从槽位 ${currentSaveSlot} 读取存档！`);
+                } else {
+                    showSaveMessage('❌ 存档损坏或格式错误！');
+                }
+            } catch (e) {
+                console.error('读取失败:', e);
+                showSaveMessage('❌ 读取失败：' + e.message);
+            }
+        }
+
+        // 删除存档
+        function deleteSave() {
+            const meta = getSlotMetadata()[currentSaveSlot];
+
+            if (!meta || !meta.hasSave) {
+                showSaveMessage(`❌ 槽位 ${currentSaveSlot} 没有存档可删除！`);
+                return;
+            }
+
+            if (confirm(`确定要删除槽位 ${currentSaveSlot} 的存档吗？\n\n如果是文件存档，请手动删除对应的 .mca 文件。\n\n此操作不可恢复！`)) {
+                // 删除 localStorage 中的存档
+                const saveKey = getSaveKey(currentSaveSlot);
+                localStorage.removeItem(saveKey);
+
+                // 更新槽位元数据
+                const slotMeta = getSlotMetadata();
+                delete slotMeta[currentSaveSlot];
+                saveSlotMetadata(slotMeta);
+                updateSlotUI();
+
+                showSaveMessage(`✅ 槽位 ${currentSaveSlot} 的存档信息已删除！`);
+                appendChat(`槽位 ${currentSaveSlot} 的存档信息已删除！`);
+            }
+        }
+
+        // 导出存档到文件（加密）
+        function exportSave() {
+            try {
+                const saveData = serializeSaveData();
+                const encrypted = encryptData(saveData);
+                const blob = new Blob([encrypted], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `MCAI_Save_${new Date().toISOString().slice(0, 10)}.mca`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showSaveMessage('✅ 存档导出成功！');
+            } catch (e) {
+                console.error('导出失败:', e);
+                showSaveMessage('❌ 导出失败：' + e.message);
+            }
+        }
+
+        // 导入存档文件（加密）
+        function importSave() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.mca';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const encrypted = event.target.result;
+                        const saveData = decryptData(encrypted);
+                        if (saveData && deserializeSaveData(saveData)) {
+                            showSaveMessage('✅ 存档导入成功！');
+                            appendChat('存档已导入！');
+                        } else {
+                            showSaveMessage('❌ 存档损坏或密码错误！');
+                        }
+                    } catch (e) {
+                        console.error('导入失败:', e);
+                        showSaveMessage('❌ 导入失败：' + e.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // 显示保存消息
+        function showSaveMessage(msg) {
+            const msgEl = document.getElementById('save-message');
+            msgEl.textContent = msg;
+            setTimeout(() => {
+                if (msgEl.textContent === msg) msgEl.textContent = '';
+            }, 3000);
+        }
+
+        // 打开存档系统
+        function openSaveSystem() {
+            document.getElementById('save-system-ui').style.display = 'flex';
+            controls.unlock();
+
+            // 初始化槽位 UI
+            updateSlotUI();
+
+            // 检查 localStorage 使用情况
+            try {
+                const used = JSON.stringify(localStorage).length;
+                const usedKB = (used / 1024).toFixed(2);
+                console.log(`localStorage 使用量: ${usedKB} KB`);
+
+                // 如果使用量超过 2MB，显示警告
+                if (used > 2 * 1024 * 1024) {
+                    showSaveMessage('⚠️ 本地存储使用量较大 (' + usedKB + ' KB)，建议导出存档');
+                }
+            } catch (e) {
+                console.error('无法检查 localStorage 使用量:', e);
+            }
+        }
+
+        // 存档系统事件监听
+        document.getElementById('save-system-close').addEventListener('click', () => {
+            document.getElementById('save-system-ui').style.display = 'none';
+            if (!isInventoryOpen) controls.lock();
+        });
+
+        document.getElementById('btn-save-game').addEventListener('click', saveGame);
+        document.getElementById('btn-load-game').addEventListener('click', loadGame);
+        document.getElementById('btn-delete-save').addEventListener('click', deleteSave);
+        document.getElementById('btn-export-save').addEventListener('click', exportSave);
+        document.getElementById('btn-import-save').addEventListener('click', importSave);
+
+        // 槽位切换事件
+        for (let i = 1; i <= MAX_SLOTS; i++) {
+            document.getElementById(`slot-${i}`).addEventListener('click', () => {
+                currentSaveSlot = i;
+                updateSlotUI();
+                showSaveMessage(`已切换到槽位 ${i}`);
+            });
+        }
+
+        const invState = { hotbar: new Array(9).fill(null), main: new Array(45).fill(null), crafting: new Array(9).fill(null), output: null, dragged: null };
+        let currentSlotIndex = 0; let isInventoryOpen = false;
+
+        // 开局硬核模式：只给 10 个黑曜石
+        invState.hotbar[0] = { type: 'obsidian', count: 10 };
+
+        const hotbarEl = document.getElementById('hotbar'); const inventoryGridEl = document.getElementById('inventory-grid'); const draggedIconEl = document.getElementById('dragged-icon'); const handItemEl = document.getElementById('hand-item');
+        for (let i = 0; i < 9; i++) { const slot = document.createElement('div'); slot.className = 'slot'; slot.id = `hotbar-${i}`; slot.setAttribute('data-container', 'hotbar'); slot.setAttribute('data-index', i); slot.setAttribute('data-key', i + 1); hotbarEl.appendChild(slot); }
+        for (let row = 0; row < 5; row++) { const rowDiv = document.createElement('div'); rowDiv.className = 'inv-row'; for (let col = 0; col < 9; col++) { const i = row * 9 + col; const slot = document.createElement('div'); slot.className = 'slot'; slot.setAttribute('data-container', 'main'); slot.setAttribute('data-index', i); rowDiv.appendChild(slot); } inventoryGridEl.appendChild(rowDiv); }
+
+        function renderSlotEl(el, item) {
+            if (item && item.count > 0) { el.style.backgroundImage = `url(${icons[item.type]})`; el.setAttribute('data-count', item.count); }
+            else { el.style.backgroundImage = 'none'; el.removeAttribute('data-count'); }
+        }
+
+        function updateHeldItem3D() {
+            heldItemGroup.clear(); const activeItem = invState.hotbar[currentSlotIndex]; if (!activeItem || activeItem.count <= 0) return;
+            const type = activeItem.type;
+            if (ITEMS[type] && ITEMS[type].type === 'block') {
+                const mesh = new THREE.Mesh(blockGeometry, materials[type]); mesh.scale.set(0.3, 0.3, 0.3); mesh.rotation.set(Math.PI / 8, -Math.PI / 4, 0); heldItemGroup.add(mesh);
+            } else {
+                const data = itemPixels[type]; if (!data) return;
+                let count = 0; for (let i = 0; i < 256; i++) { if (data[i * 4 + 3] > 0) count++; }
+                const voxelGeo = new THREE.BoxGeometry(1 / 16, 1 / 16, 1 / 16); const instMesh = new THREE.InstancedMesh(voxelGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), count);
+                const dummy = new THREE.Object3D(); const color = new THREE.Color(); let idx = 0;
+                for (let i = 0; i < 256; i++) {
+                    if (data[i * 4 + 3] > 0) {
+                        dummy.position.set(((i % 16) - 7.5) / 16, (7.5 - Math.floor(i / 16)) / 16, 0); dummy.updateMatrix();
+                        instMesh.setMatrixAt(idx, dummy.matrix); color.setRGB(data[i * 4] / 255, data[i * 4 + 1] / 255, data[i * 4 + 2] / 255); instMesh.setColorAt(idx, color); idx++;
+                    }
+                }
+                instMesh.rotation.set(0, Math.PI, 0);
+                if (ITEMS[type] && ITEMS[type].type === 'tool') { instMesh.scale.set(0.6, 0.6, 0.6); instMesh.rotation.z = -Math.PI / 4; } else { instMesh.scale.set(0.4, 0.4, 0.4); }
+                heldItemGroup.add(instMesh);
+            }
+        }
+
+        // 鼠标跟随机制
+        document.addEventListener('mousemove', (e) => {
+            if (isInventoryOpen && invState.dragged) {
+                draggedIconEl.style.left = e.clientX + 'px';
+                draggedIconEl.style.top = e.clientY + 'px';
+            }
+        });
+
+        function renderInventoryUI() {
+            // 动态控制合成栏大小
+            const gridEl = document.getElementById('crafting-grid');
+            document.getElementById('crafting-title').innerText = craftingMode === 2 ? "合成 (2x2)" : "高级合成 (3x3)";
+            if (craftingMode === 2) {
+                gridEl.className = 'crafting-grid size-2';
+                for (let i = 0; i < 9; i++) { const el = document.querySelector(`[data-container="crafting"][data-index="${i}"]`); if (el) el.style.display = i < 4 ? 'block' : 'none'; }
+            } else {
+                gridEl.className = 'crafting-grid size-3';
+                for (let i = 0; i < 9; i++) { const el = document.querySelector(`[data-container="crafting"][data-index="${i}"]`); if (el) el.style.display = 'block'; }
+            }
+
+            for (let i = 0; i < 9; i++) { const el = document.querySelector(`[data-container="hotbar"][data-index="${i}"]`); renderSlotEl(el, invState.hotbar[i]); if (i === currentSlotIndex) el.classList.add('active'); else el.classList.remove('active'); }
+            for (let i = 0; i < 45; i++) { const el = document.querySelector(`[data-container="main"][data-index="${i}"]`); if (el) renderSlotEl(el, invState.main[i]); }
+            for (let i = 0; i < 9; i++) { const el = document.querySelector(`[data-container="crafting"][data-index="${i}"]`); if (el) renderSlotEl(el, invState.crafting[i]); }
+
+            const outputEl = document.querySelector(`[data-container="output"][data-index="0"]`); if (outputEl) renderSlotEl(outputEl, invState.output);
+
+            if (invState.dragged) { draggedIconEl.style.display = 'block'; renderSlotEl(draggedIconEl, invState.dragged); } else { draggedIconEl.style.display = 'none'; }
+            updateHeldItem3D();
+        }
+
+        function getCraftingPattern() {
+            let minX = 3, maxX = -1, minY = 3, maxY = -1;
+            for (let i = 0; i < 9; i++) {
+                if (craftingMode === 2 && i > 3) continue; // 2x2 mode uses 0,1,2,3
+                if (invState.crafting[i]) {
+                    let x, y;
+                    if (craftingMode === 2) { x = i % 2; y = Math.floor(i / 2); }
+                    else { x = i % 3; y = Math.floor(i / 3); }
+                    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+                }
+            }
+            if (minX > maxX) return "";
+            let pattern = "";
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    let type = "null";
+                    if (craftingMode === 2) {
+                        let targetI = y * 2 + x;
+                        if (targetI < 4 && invState.crafting[targetI]) type = invState.crafting[targetI].type;
+                    } else {
+                        let targetI = y * 3 + x;
+                        if (invState.crafting[targetI]) type = invState.crafting[targetI].type;
+                    }
+                    pattern += type + ",";
+                }
+                pattern += ";";
+            }
+            return pattern;
+        }
+
+        function checkCrafting() {
+            const c = invState.crafting; const t = (i) => c[i] ? c[i].type : null;
+            let total = 0; let counts = {};
+            for (let i = 0; i < 9; i++) { if (t(i)) { total++; counts[t(i)] = (counts[t(i)] || 0) + 1; } }
+            invState.output = null;
+            if (total === 0) return;
+
+            // 无固定形状配方
+            if (total === 1 && counts['log']) invState.output = { type: 'planks', count: 4 };
+            else if (total === 1 && counts['blaze_rod']) invState.output = { type: 'blaze_powder', count: 2 };
+            else if (total === 2 && counts['ender_pearl'] && counts['blaze_powder']) invState.output = { type: 'ender_eye', count: 1 };
+            else if (total === 2 && counts['iron_ore'] && counts['flint']) invState.output = { type: 'flint_and_steel', count: 1 };
+            else {
+                // 固定形状配方验证
+                const p = getCraftingPattern();
+                if (p === "planks,;planks,;") invState.output = { type: 'stick', count: 4 };
+                else if (p === "planks,planks,;planks,planks,;") invState.output = { type: 'crafting_table', count: 1 };
+                else if (p === "flint,;stick,;") invState.output = { type: 'arrow', count: 4 };
+
+                // 以下为 3x3 专属配方 (含新加的金镐和钻石镐)
+                if (craftingMode === 3) {
+                    if (p === "planks,planks,planks,;null,stick,null,;null,stick,null,;") invState.output = { type: 'wooden_pickaxe', count: 1 };
+                    else if (p === "stone,stone,stone,;null,stick,null,;null,stick,null,;") invState.output = { type: 'stone_pickaxe', count: 1 };
+                    else if (p === "iron_ore,iron_ore,iron_ore,;null,stick,null,;null,stick,null,;") invState.output = { type: 'iron_pickaxe', count: 1 };
+                    else if (p === "gold_ore,gold_ore,gold_ore,;null,stick,null,;null,stick,null,;") invState.output = { type: 'gold_pickaxe', count: 1 };
+                    else if (p === "diamond_ore,diamond_ore,diamond_ore,;null,stick,null,;null,stick,null,;") invState.output = { type: 'diamond_pickaxe', count: 1 };
+                    else if (p === "string,stick,null,;string,null,stick,;string,stick,null,;" || p === "null,stick,string,;stick,null,string,;null,stick,string,;") invState.output = { type: 'bow', count: 1 };
+                }
+            }
+        }
+
+        // 【右键单放 / 右键分半】的复杂UI交互
+        function handleSlotClick(container, index, button) {
+            let targetSlot = null; if (container !== 'output') targetSlot = invState[container][index];
+
+            if (button === 2) {
+                // 鼠标右键逻辑
+                if (container === 'output') return; // 右键拿取合成产物与左键无异，交由后续处理
+
+                if (invState.dragged) {
+                    // 放 1 个
+                    if (!targetSlot) {
+                        invState[container][index] = { ...invState.dragged, count: 1 };
+                        invState.dragged.count--; if (invState.dragged.count <= 0) invState.dragged = null;
+                    } else if (targetSlot.type === invState.dragged.type && targetSlot.count < 64) {
+                        targetSlot.count++;
+                        invState.dragged.count--; if (invState.dragged.count <= 0) invState.dragged = null;
+                    }
+                } else if (targetSlot) {
+                    // 拿一半
+                    let half = Math.ceil(targetSlot.count / 2);
+                    invState.dragged = { ...targetSlot, count: half };
+                    targetSlot.count -= half;
+                    if (targetSlot.count <= 0) invState[container][index] = null;
+                }
+            } else {
+                // 鼠标左键逻辑
+                if (container === 'output') {
+                    if (invState.output && (!invState.dragged || (invState.dragged.type === invState.output.type && invState.dragged.count + invState.output.count <= 64))) {
+                        if (!invState.dragged) invState.dragged = { ...invState.output }; else invState.dragged.count += invState.output.count;
+                        for (let i = 0; i < 9; i++) { if (invState.crafting[i]) { invState.crafting[i].count--; if (invState.crafting[i].count <= 0) invState.crafting[i] = null; } }
+                    }
+                } else {
+                    if (invState.dragged && targetSlot) {
+                        if (invState.dragged.type === targetSlot.type && targetSlot.count < 64) {
+                            let moveAmount = Math.min(64 - targetSlot.count, invState.dragged.count);
+                            targetSlot.count += moveAmount; invState.dragged.count -= moveAmount; if (invState.dragged.count <= 0) invState.dragged = null;
+                        } else { invState[container][index] = invState.dragged; invState.dragged = targetSlot; }
+                    } else if (invState.dragged && !targetSlot) { invState[container][index] = invState.dragged; invState.dragged = null; }
+                    else if (!invState.dragged && targetSlot) { invState.dragged = targetSlot; invState[container][index] = null; }
+                }
+            }
+            if (container === 'crafting' || container === 'output') checkCrafting();
+            renderInventoryUI();
+        }
+
+        function addBlockToInventory(type, count = 1) {
+            let left = count;
+            for (let i = 0; i < 9 && left > 0; i++) { if (invState.hotbar[i] && invState.hotbar[i].type === type && invState.hotbar[i].count < 64) { let add = Math.min(64 - invState.hotbar[i].count, left); invState.hotbar[i].count += add; left -= add; } }
+            for (let i = 0; i < 9 && left > 0; i++) { if (!invState.hotbar[i]) { invState.hotbar[i] = { type, count: left }; left = 0; } }
+            for (let i = 0; i < 45 && left > 0; i++) { if (invState.main[i] && invState.main[i].type === type && invState.main[i].count < 64) { let add = Math.min(64 - invState.main[i].count, left); invState.main[i].count += add; left -= add; } }
+            for (let i = 0; i < 45 && left > 0; i++) { if (!invState.main[i]) { invState.main[i] = { type, count: left }; left = 0; } }
+        }
+
+        // ==========================================
+        // 5. 通用实体引擎 (蜘蛛削弱与烈焰人调整)
+        // ==========================================
+        const STRONGHOLD_POS = { x: 64, y: -25, z: 64 };
+
+        function spawnArrow(pos, dir) {
+            const arrowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 1.2), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+            arrowMesh.position.copy(pos); arrowMesh.lookAt(pos.clone().add(dir));
+            scene.add(arrowMesh);
+
+            entities.push({
+                type: 'arrow', mesh: arrowMesh, velocity: dir.clone().multiplyScalar(60), life: 5,
+                update: function (delta) {
+                    this.life -= delta;
+                    if (this.life <= 0) return true;
+
+                    for (let e of entities) {
+                        if (e === this || e.type === 'arrow' || e.type === 'eye') continue;
+                        let hitRadius = 1.2; let targetY = e.mesh.position.y;
+                        if (e.type === 'dragon') { hitRadius = 12.0; targetY += 2; }
+                        else if (e.type === 'crystal') { hitRadius = 2.0; targetY += 1; }
+                        else if (e.type === 'enderman') { hitRadius = 1.5; targetY += 1.5; }
+                        else if (e.type === 'zombie' || e.type === 'blaze') { hitRadius = 1.2; targetY += 1.2; }
+                        else if (e.type === 'spider') { hitRadius = 1.5; targetY += 0.4; }
+                        else if (e.type === 'pig') { hitRadius = 1.2; targetY += 0.5; }
+
+                        const dist = new THREE.Vector3(e.mesh.position.x, targetY, e.mesh.position.z).distanceTo(this.mesh.position);
+                        if (dist < hitRadius) {
+                            let dmg = 8; e.hp -= dmg;
+                            if (e.type === 'crystal') e.hp = 0;
+                            if (e.mesh.children) e.mesh.children.forEach(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0xaa0000); });
+                            if (e.type === 'enderman' && e.onHit) e.onHit();
+                            if (e.type === 'pig' || e.type === 'zombie' || e.type === 'blaze' || e.type === 'spider') {
+                                const kb = this.velocity.clone().normalize();
+                                if (e.type === 'pig') { e.target.copy(e.mesh.position).addScaledVector(kb, 3); e.state = 'wander'; e.timer = 2; }
+                                else { e.mesh.position.addScaledVector(kb, 1); }
+                            }
+                            return true;
+                        }
+                    }
+
+                    const step = this.velocity.clone().multiplyScalar(delta);
+                    this.mesh.position.add(step);
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.1, 0.1)) return true;
+                    return false;
+                }
+            });
+        }
+
+        function spawnPig(x, z, y) {
+            const pMat = new THREE.MeshLambertMaterial({ color: 0xffb6c1 }); const sMat = new THREE.MeshLambertMaterial({ color: 0xff8899 });
+            const pigGroup = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1.2), pMat); body.position.y = 0.5; pigGroup.add(body);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), pMat); head.position.set(0, 0.8, 0.7); pigGroup.add(head);
+            const snout = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), sMat); snout.position.set(0, 0.7, 1.05); pigGroup.add(snout);
+            const legPos = [[-0.3, 0.2, 0.4], [0.3, 0.2, 0.4], [-0.3, 0.2, -0.4], [0.3, 0.2, -0.4]]; const legs = [];
+            const legGeo = new THREE.BoxGeometry(0.2, 0.4, 0.2); legGeo.translate(0, -0.2, 0);
+            legPos.forEach(pos => { const leg = new THREE.Mesh(legGeo, pMat); leg.position.set(...pos); pigGroup.add(leg); legs.push(leg); });
+            pigGroup.position.set(x, y + 2, z); scene.add(pigGroup);
+
+            entities.push({
+                type: 'pig', mesh: pigGroup, hp: 10, legs: legs, state: 'idle', timer: 0, velocity: new THREE.Vector3(), target: new THREE.Vector3(),
+                update: function (delta, time) {
+                    if (this.hp <= 0) { addBlockToInventory('raw_porkchop', 1); renderInventoryUI(); return true; }
+                    this.timer -= delta;
+                    if (this.timer <= 0) {
+                        if (this.state === 'idle') { this.state = 'wander'; this.timer = 2 + Math.random() * 3; this.target.set(this.mesh.position.x + (Math.random() - 0.5) * 10, this.mesh.position.y, this.mesh.position.z + (Math.random() - 0.5) * 10); this.mesh.lookAt(this.target.x, this.mesh.position.y, this.target.z); }
+                        else { this.state = 'idle'; this.timer = 1 + Math.random() * 4; }
+                    }
+                    if (this.state === 'wander') {
+                        const dir = new THREE.Vector3().subVectors(this.target, this.mesh.position); dir.y = 0;
+                        if (dir.length() > 0.1) {
+                            dir.normalize(); const stepX = dir.x * 1.5 * delta; const stepZ = dir.z * 1.5 * delta;
+                            const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                            if (!checkCollisionGeneric(px + stepX, py - 0.2, pz, 0.3, 0.5)) this.mesh.position.x += stepX; else { this.timer = 0; if (this.velocity.y === 0) this.velocity.y = 6; }
+                            if (!checkCollisionGeneric(px, py - 0.2, pz + stepZ, 0.3, 0.5)) this.mesh.position.z += stepZ; else { this.timer = 0; if (this.velocity.y === 0) this.velocity.y = 6; }
+                            const ls = Math.sin(time * 15) * 0.5; this.legs[0].rotation.x = ls; this.legs[1].rotation.x = -ls; this.legs[2].rotation.x = -ls; this.legs[3].rotation.x = ls;
+                        }
+                    } else { this.legs.forEach(leg => leg.rotation.x = 0); }
+
+                    this.velocity.y -= 25.0 * delta; this.mesh.position.y += this.velocity.y * delta;
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y - 0.2, this.mesh.position.z, 0.3, 0.1)) { this.mesh.position.y = Math.floor(this.mesh.position.y - 0.2) + 1 + 0.2; this.velocity.y = 0; }
+                    this.mesh.children.forEach(c => { if (c.material.emissive && c.material.emissive.r > 0) { c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); c.material.emissive.g = Math.max(0, c.material.emissive.g - delta * 3); c.material.emissive.b = Math.max(0, c.material.emissive.b - delta * 3); } });
+                    return false;
+                }
+            });
+        }
+
+        const zHeadMatBase = new THREE.MeshLambertMaterial({ color: 0x3b8526 }); const zBodyMatBase = new THREE.MeshLambertMaterial({ color: 0x00aaff }); const zLegMatBase = new THREE.MeshLambertMaterial({ color: 0x4a2a75 });
+        const zLegGeo = new THREE.BoxGeometry(0.25, 0.75, 0.25); zLegGeo.translate(0, -0.375, 0);
+
+        function spawnZombie(x, z, y) {
+            const zhm = zHeadMatBase.clone(); const zbm = zBodyMatBase.clone(); const zlm = zLegMatBase.clone();
+            const zGroup = new THREE.Group();
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), zhm); head.position.y = 1.6; zGroup.add(head);
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.75, 0.25), zbm); body.position.y = 1.0; zGroup.add(body);
+            const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 0.2), zhm); armL.position.set(0.35, 1.2, 0.2); armL.rotation.x = Math.PI / 2; zGroup.add(armL);
+            const armR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 0.2), zhm); armR.position.set(-0.35, 1.2, 0.2); armR.rotation.x = Math.PI / 2; zGroup.add(armR);
+            const legs = [];
+            const legL = new THREE.Mesh(zLegGeo, zlm); legL.position.set(0.15, 0.6, 0); zGroup.add(legL); legs.push(legL);
+            const legR = new THREE.Mesh(zLegGeo, zlm); legR.position.set(-0.15, 0.6, 0); zGroup.add(legR); legs.push(legR);
+
+            zGroup.position.set(x, y + 2, z); scene.add(zGroup);
+            entities.push({
+                type: 'zombie', mesh: zGroup, legs: legs, hp: 20, velocity: new THREE.Vector3(), burnTimer: 0,
+                update: function (delta, time, sunHeight, isNight) {
+                    if (this.hp <= 0) { addBlockToInventory('rotten_flesh', 1); renderInventoryUI(); return true; }
+                    const sSurfaceY = Math.floor(noise2D(this.mesh.position.x * 0.04, this.mesh.position.z * 0.04) * 5);
+                    if (!isNight && this.mesh.position.y >= sSurfaceY && currentDimension === 'overworld') {
+                        this.burnTimer += delta;
+                        if (this.burnTimer > 1) { this.hp -= 2; this.burnTimer = 0; this.mesh.children.forEach(c => c.material.emissive.setHex(0xffaa00)); }
+                    }
+                    const dist = this.mesh.position.distanceTo(camera.position);
+                    if (dist < 20 && !isDead) {
+                        const dir = new THREE.Vector3().subVectors(camera.position, this.mesh.position); dir.y = 0; dir.normalize();
+                        this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
+                        if (dist < 1.5 && playerInvulnTimer <= 0 && gameMode === 1) { takeDamage(3); velocity.x = dir.x * -15; velocity.z = dir.z * -15; }
+                        if (dist > 1.0) {
+                            const stepX = dir.x * 3.5 * delta; const stepZ = dir.z * 3.5 * delta;
+                            const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                            if (!checkCollisionGeneric(px + stepX, py - 0.15, pz, 0.35, 1.8)) this.mesh.position.x += stepX; else if (this.velocity.y === 0) this.velocity.y = 6.5;
+                            if (!checkCollisionGeneric(px, py - 0.15, pz + stepZ, 0.35, 1.8)) this.mesh.position.z += stepZ; else if (this.velocity.y === 0) this.velocity.y = 6.5;
+                            const ls = Math.sin(time * 10) * 0.6; this.legs[0].rotation.x = ls; this.legs[1].rotation.x = -ls;
+                        }
+                    } else { this.legs.forEach(leg => leg.rotation.x = 0); }
+
+                    this.velocity.y -= 25.0 * delta; this.mesh.position.y += this.velocity.y * delta;
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y - 0.15, this.mesh.position.z, 0.35, 0.1)) { this.mesh.position.y = Math.floor(this.mesh.position.y - 0.15) + 1 + 0.15; this.velocity.y = 0; }
+                    this.mesh.children.forEach(c => { if (c.material && c.material.emissive && c.material.emissive.r > 0) { c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); c.material.emissive.g = Math.max(0, c.material.emissive.g - delta * 3); c.material.emissive.b = Math.max(0, c.material.emissive.b - delta * 3); } });
+                    return false;
+                }
+            });
+        }
+
+        // 【蜘蛛削弱】缩小体积与速度，增加掉落
+        function spawnSpider(x, z, y) {
+            const bMat = new THREE.MeshLambertMaterial({ color: 0x221111 }); const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const spGroup = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.9), bMat); body.position.y = 0.2; spGroup.add(body);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.45), bMat); head.position.set(0, 0.2, 0.6); spGroup.add(head);
+            const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), eyeMat); eye1.position.set(0.12, 0.25, 0.85); spGroup.add(eye1);
+            const eye2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), eyeMat); eye2.position.set(-0.12, 0.25, 0.85); spGroup.add(eye2);
+
+            const legs = [];
+            for (let i = 0; i < 8; i++) {
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.08), bMat);
+                spGroup.add(leg); legs.push(leg);
+            }
+
+            spGroup.position.set(x, y + 1, z); scene.add(spGroup);
+            entities.push({
+                type: 'spider', mesh: spGroup, legs: legs, hp: 16, velocity: new THREE.Vector3(), target: new THREE.Vector3(), state: 'idle', timer: 0,
+                update: function (delta, time) {
+                    if (this.hp <= 0) { addBlockToInventory('string', Math.floor(Math.random() * 2) + 5); renderInventoryUI(); return true; }
+
+                    const dist = this.mesh.position.distanceTo(camera.position);
+                    if (dist < 16 && !isDead) {
+                        const dir = new THREE.Vector3().subVectors(camera.position, this.mesh.position); dir.y = 0; dir.normalize();
+                        this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
+                        if (dist < 1.5 && playerInvulnTimer <= 0 && gameMode === 1) { takeDamage(2); velocity.x = dir.x * -10; velocity.z = dir.z * -10; }
+
+                        if (dist > 1.2) {
+                            const stepX = dir.x * 2.5 * delta; const stepZ = dir.z * 2.5 * delta; // 爬行速度降低
+                            const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                            if (!checkCollisionGeneric(px + stepX, py, pz, 0.45, 0.6)) this.mesh.position.x += stepX; else if (this.velocity.y === 0) this.velocity.y = 6;
+                            if (!checkCollisionGeneric(px, py, pz + stepZ, 0.45, 0.6)) this.mesh.position.z += stepZ; else if (this.velocity.y === 0) this.velocity.y = 6;
+
+                            for (let i = 0; i < 8; i++) {
+                                const side = i % 2 === 0 ? 1 : -1; const offset = Math.floor(i / 2);
+                                this.legs[i].position.set(side * (0.45 + Math.abs(Math.sin(time * 15 + offset)) * 0.2), 0.3, (offset - 1.5) * 0.3);
+                                this.legs[i].rotation.z = side * Math.PI / 4;
+                            }
+                        }
+                    } else {
+                        this.timer -= delta;
+                        if (this.timer <= 0) {
+                            if (this.state === 'idle') { this.state = 'wander'; this.timer = 2 + Math.random() * 3; this.target.set(this.mesh.position.x + (Math.random() - 0.5) * 10, this.mesh.position.y, this.mesh.position.z + (Math.random() - 0.5) * 10); this.mesh.lookAt(this.target.x, this.mesh.position.y, this.target.z); }
+                            else { this.state = 'idle'; this.timer = 1 + Math.random() * 4; }
+                        }
+                        if (this.state === 'wander') {
+                            const dir = new THREE.Vector3().subVectors(this.target, this.mesh.position); dir.y = 0;
+                            if (dir.length() > 0.1) {
+                                dir.normalize(); const stepX = dir.x * 1.0 * delta; const stepZ = dir.z * 1.0 * delta;
+                                const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                                if (!checkCollisionGeneric(px + stepX, py, pz, 0.45, 0.6)) this.mesh.position.x += stepX; else { this.timer = 0; if (this.velocity.y === 0) this.velocity.y = 5; }
+                                if (!checkCollisionGeneric(px, py, pz + stepZ, 0.45, 0.6)) this.mesh.position.z += stepZ; else { this.timer = 0; if (this.velocity.y === 0) this.velocity.y = 5; }
+                                for (let i = 0; i < 8; i++) { const side = i % 2 === 0 ? 1 : -1; const offset = Math.floor(i / 2); this.legs[i].position.set(side * (0.45 + Math.abs(Math.sin(time * 10 + offset)) * 0.2), 0.3, (offset - 1.5) * 0.3); this.legs[i].rotation.z = side * Math.PI / 4; }
+                            }
+                        } else { for (let i = 0; i < 8; i++) { const side = i % 2 === 0 ? 1 : -1; const offset = Math.floor(i / 2); this.legs[i].position.set(side * 0.45, 0.3, (offset - 1.5) * 0.3); this.legs[i].rotation.z = side * Math.PI / 4; } }
+                    }
+
+                    this.velocity.y -= 25.0 * delta; this.mesh.position.y += this.velocity.y * delta;
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.45, 0.1)) { this.mesh.position.y = Math.floor(this.mesh.position.y) + 1; this.velocity.y = 0; }
+                    this.mesh.children.forEach(c => { if (c.material && c.material.emissive && c.material.emissive.r > 0) { c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); c.material.emissive.g = Math.max(0, c.material.emissive.g - delta * 3); c.material.emissive.b = Math.max(0, c.material.emissive.b - delta * 3); } });
+                    return false;
+                }
+            });
+        }
+
+        // 【烈焰人调整】伤害降低、掉落增多
+        function spawnBlaze(x, z, y) {
+            const bMat = new THREE.MeshLambertMaterial({ color: 0xffaa00 });
+            const bGroup = new THREE.Group();
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), bMat); head.position.y = 1.8; bGroup.add(head);
+            const rods = [];
+            for (let i = 0; i < 8; i++) {
+                const rod = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.1), bMat);
+                bGroup.add(rod); rods.push(rod);
+            }
+
+            bGroup.position.set(x, y + 2, z); scene.add(bGroup);
+            entities.push({
+                type: 'blaze', mesh: bGroup, rods: rods, hp: 20, velocity: new THREE.Vector3(), targetY: y + 2,
+                update: function (delta, time) {
+                    if (this.hp <= 0) { addBlockToInventory('blaze_rod', Math.floor(Math.random() * 2) + 2); renderInventoryUI(); return true; }
+                    for (let i = 0; i < 8; i++) {
+                        const rRadius = i < 4 ? 0.6 : 0.8; const rSpeed = i < 4 ? 2 : -1.5; const rHeight = i < 4 ? 1.4 : 1.0;
+                        const angle = time * rSpeed + (i * Math.PI / 2);
+                        this.rods[i].position.set(Math.cos(angle) * rRadius, rHeight + Math.sin(time * 5 + i) * 0.2, Math.sin(angle) * rRadius);
+                    }
+
+                    const dist = this.mesh.position.distanceTo(camera.position);
+                    if (dist < 20 && !isDead) {
+                        const dir = new THREE.Vector3().subVectors(camera.position, this.mesh.position); dir.y = 0; dir.normalize();
+                        this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
+                        // 伤害降低至 2 (一颗心)
+                        if (dist < 2.0 && playerInvulnTimer <= 0 && gameMode === 1) { takeDamage(2); velocity.x = dir.x * -15; velocity.z = dir.z * -15; }
+
+                        if (dist > 1.5) {
+                            const stepX = dir.x * 3.0 * delta; const stepZ = dir.z * 3.0 * delta;
+                            const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                            if (!checkCollisionGeneric(px + stepX, py, pz, 0.4, 1.8)) this.mesh.position.x += stepX;
+                            if (!checkCollisionGeneric(px, py, pz + stepZ, 0.4, 1.8)) this.mesh.position.z += stepZ;
+                        }
+                        this.targetY = camera.position.y;
+                    } else { this.targetY = y + 2 + Math.sin(time) * 1.5; }
+
+                    const dY = this.targetY - this.mesh.position.y;
+                    this.velocity.y += dY * delta * 5; this.velocity.y *= 0.9;
+                    this.mesh.position.y += this.velocity.y * delta;
+
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z, 0.4, 0.1)) { this.mesh.position.y = Math.floor(this.mesh.position.y) + 1; this.velocity.y = 0; }
+                    this.mesh.children.forEach(c => { if (c.material && c.material.emissive && c.material.emissive.r > 0) { c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); c.material.emissive.g = Math.max(0, c.material.emissive.g - delta * 3); c.material.emissive.b = Math.max(0, c.material.emissive.b - delta * 3); } });
+                    return false;
+                }
+            });
+        }
+
+        function spawnEnderman(x, z, y) {
+            const eMat = new THREE.MeshLambertMaterial({ color: 0x111111 }); const eyeMat = new THREE.MeshBasicMaterial({ color: 0xcc00ff });
+            const eGroup = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.3), eMat); body.position.y = 1.6; eGroup.add(body);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), eMat); head.position.y = 2.45; eGroup.add(head);
+            const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.52), eyeMat); eyes.position.y = 2.45; eGroup.add(eyes);
+
+            const armGeo = new THREE.BoxGeometry(0.15, 1.5, 0.15); armGeo.translate(0, -0.75, 0);
+            const armL = new THREE.Mesh(armGeo, eMat); armL.position.set(0.35, 2.1, 0); eGroup.add(armL);
+            const armR = new THREE.Mesh(armGeo, eMat); armR.position.set(-0.35, 2.1, 0); eGroup.add(armR);
+
+            const legGeo = new THREE.BoxGeometry(0.15, 1.5, 0.15); legGeo.translate(0, -0.75, 0);
+            const legs = [];
+            const legL = new THREE.Mesh(legGeo, eMat); legL.position.set(0.15, 1.0, 0); eGroup.add(legL); legs.push(legL);
+            const legR = new THREE.Mesh(legGeo, eMat); legR.position.set(-0.15, 1.0, 0); eGroup.add(legR); legs.push(legR);
+
+            eGroup.position.set(x, y + 2, z); scene.add(eGroup);
+            entities.push({
+                type: 'enderman', mesh: eGroup, legs: legs, arms: [armL, armR], hp: 40, velocity: new THREE.Vector3(), state: 'idle', target: new THREE.Vector3(), timer: 0,
+                update: function (delta, time) {
+                    if (this.hp <= 0) { addBlockToInventory('ender_pearl', 1); renderInventoryUI(); return true; }
+                    const dist = this.mesh.position.distanceTo(camera.position);
+                    if (this.state === 'aggro') {
+                        if (dist < 30 && !isDead) {
+                            const dir = new THREE.Vector3().subVectors(camera.position, this.mesh.position); dir.y = 0; dir.normalize();
+                            this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
+                            this.arms.forEach(a => a.rotation.x = Math.PI / 2 + Math.sin(time * 20) * 0.2);
+
+                            if (dist < 2.0 && playerInvulnTimer <= 0 && gameMode === 1) { takeDamage(5); velocity.x = dir.x * -20; velocity.z = dir.z * -20; }
+                            if (dist > 1.5) {
+                                const stepX = dir.x * 6.0 * delta; const stepZ = dir.z * 6.0 * delta;
+                                const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                                if (!checkCollisionGeneric(px + stepX, py - 0.5, pz, 0.4, 2.8)) this.mesh.position.x += stepX; else if (this.velocity.y === 0) this.velocity.y = 7.5;
+                                if (!checkCollisionGeneric(px, py - 0.5, pz + stepZ, 0.4, 2.8)) this.mesh.position.z += stepZ; else if (this.velocity.y === 0) this.velocity.y = 7.5;
+                                const ls = Math.sin(time * 15) * 0.8; this.legs[0].rotation.x = ls; this.legs[1].rotation.x = -ls;
+                            }
+                        } else { this.state = 'idle'; }
+                    } else {
+                        this.timer -= delta; this.arms.forEach(a => a.rotation.x = 0);
+                        if (this.timer <= 0) {
+                            if (Math.random() < 0.3) {
+                                this.target.set(this.mesh.position.x + (Math.random() - 0.5) * 20, this.mesh.position.y, this.mesh.position.z + (Math.random() - 0.5) * 20);
+                                this.mesh.lookAt(this.target.x, this.mesh.position.y, this.target.z); this.timer = 3;
+                            } else { this.timer = 2; this.target.copy(this.mesh.position); }
+                        }
+                        const dir = new THREE.Vector3().subVectors(this.target, this.mesh.position); dir.y = 0;
+                        if (dir.length() > 0.5) {
+                            dir.normalize(); const stepX = dir.x * 2.0 * delta; const stepZ = dir.z * 2.0 * delta;
+                            const px = this.mesh.position.x; const py = this.mesh.position.y; const pz = this.mesh.position.z;
+                            if (!checkCollisionGeneric(px + stepX, py - 0.5, pz, 0.4, 2.8)) this.mesh.position.x += stepX;
+                            if (!checkCollisionGeneric(px, py - 0.5, pz + stepZ, 0.4, 2.8)) this.mesh.position.z += stepZ;
+                            const ls = Math.sin(time * 8) * 0.4; this.legs[0].rotation.x = ls; this.legs[1].rotation.x = -ls;
+                        } else { this.legs.forEach(leg => leg.rotation.x = 0); }
+                    }
+
+                    this.velocity.y -= 25.0 * delta; this.mesh.position.y += this.velocity.y * delta;
+                    if (checkCollisionGeneric(this.mesh.position.x, this.mesh.position.y - 0.5, this.mesh.position.z, 0.4, 0.1)) { this.mesh.position.y = Math.floor(this.mesh.position.y - 0.5) + 1 + 0.5; this.velocity.y = 0; }
+                    if (this.mesh.position.y < -80) return true;
+
+                    let isHit = false;
+                    this.mesh.children.forEach(c => { if (c.material && c.material.emissive && c.material.emissive.r > 0) { isHit = true; c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); } });
+                    if (isHit && Math.random() < 0.1) {
+                        const nx = this.mesh.position.x + (Math.random() - 0.5) * 16; const nz = this.mesh.position.z + (Math.random() - 0.5) * 16;
+                        for (let ny = this.mesh.position.y + 10; ny > -60; ny--) {
+                            if (getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))) { this.mesh.position.set(nx, ny + 2, nz); break; }
+                        }
+                    }
+                    return false;
+                },
+                onHit: function () { this.state = 'aggro'; }
+            });
+        }
+
+        function spawnEnderEyeEntity(x, y, z) {
+            const eyeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshLambertMaterial({ map: createPixelTexture('ender_eye') }));
+            eyeMesh.position.set(x, y, z); scene.add(eyeMesh);
+            entities.push({
+                type: 'eye', mesh: eyeMesh, timer: 0,
+                update: function (delta) {
+                    this.timer += delta;
+                    const target = new THREE.Vector3(STRONGHOLD_POS.x, Math.max(camera.position.y + 5, 20), STRONGHOLD_POS.z);
+                    const dir = new THREE.Vector3().subVectors(target, this.mesh.position);
+                    if (dir.length() > 2) { dir.normalize(); this.mesh.position.addScaledVector(dir, 15 * delta); } else { this.mesh.position.y -= 5 * delta; }
+                    if (this.timer > 3.0) { addBlockToInventory('ender_eye'); renderInventoryUI(); return true; }
+                    return false;
+                }
+            });
+        }
+
+        function spawnEnderCrystal(x, y, z) {
+            const cGroup = new THREE.Group();
+            const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.8, 0), new THREE.MeshBasicMaterial({ color: 0xff55ff, wireframe: true }));
+            crystal.position.y = 1; cGroup.add(crystal);
+            const core = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshLambertMaterial({ color: 0x550055 }));
+            core.position.y = 1; cGroup.add(core); cGroup.position.set(x, y, z); scene.add(cGroup);
+
+            const mat = new THREE.LineBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0 });
+            const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 10, 0)]);
+            const beam = new THREE.Line(geo, mat); cGroup.add(beam);
+
+            entities.push({
+                type: 'crystal', mesh: cGroup, beam: beam, hp: 1,
+                update: function (delta, time) {
+                    if (this.hp <= 0) {
+                        for (let i = 0; i < 30; i++) spawnParticle(this.mesh.position, 0xff55ff);
+                        return true;
+                    }
+
+                    crystal.rotation.y += delta; crystal.rotation.x += delta * 0.5; crystal.position.y = 1 + Math.sin(time * 3) * 0.3;
+                    core.rotation.y -= delta; core.position.y = 1 + Math.sin(time * 3) * 0.3;
+
+                    const dragon = entities.find(e => e.type === 'dragon');
+                    if (dragon && this.mesh.position.distanceTo(dragon.mesh.position) < 30) {
+                        this.beam.material.opacity = 0.8;
+                        const localTarget = this.mesh.worldToLocal(dragon.mesh.position.clone());
+                        this.beam.geometry.setFromPoints([new THREE.Vector3(0, 1, 0), localTarget]);
+                        // 为龙回血，如果全被炸了就没法回血
+                        dragon.hp = Math.min(200, dragon.hp + delta * 5);
+                    } else { this.beam.material.opacity = 0; }
+
+                    return false;
+                }
+            });
+        }
+
+        function spawnEnderDragon() {
+            const dMat = new THREE.MeshLambertMaterial({ color: 0x1a0a2a });
+            const dGroup = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 8), dMat); dGroup.add(body);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 2), dMat); head.position.set(0, 0.5, 5); dGroup.add(head);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+            const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), eyeMat); eyeL.position.set(0.8, 0.8, 5.5); dGroup.add(eyeL);
+            const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), eyeMat); eyeR.position.set(-0.8, 0.8, 5.5); dGroup.add(eyeR);
+            for (let i = 0; i < 4; i++) {
+                const spike = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1, 0.5), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+                spike.position.set(0, 1.5, 2 - i * 2); dGroup.add(spike);
+            }
+            const wingGeo = new THREE.BoxGeometry(12, 0.1, 4); wingGeo.translate(6, 0, 0);
+            const wingL = new THREE.Mesh(wingGeo, dMat); wingL.position.set(1, 1, 0); dGroup.add(wingL);
+            const wingR = new THREE.Mesh(wingGeo, dMat); wingR.position.set(-1, 1, 0); wingR.rotation.z = Math.PI; dGroup.add(wingR);
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 6), dMat); tail.position.set(0, 0, -7); dGroup.add(tail);
+
+            dGroup.scale.set(2, 2, 2);
+            dGroup.position.set(0, 50, 0); scene.add(dGroup);
+            document.getElementById('boss-bar-container').style.display = 'flex';
+
+            entities.push({
+                type: 'dragon', mesh: dGroup, wings: [wingL, wingR], hp: 200, maxHp: 200, phase: 'circle', timer: 0, angle: 0,
+                update: function (delta, time) {
+                    if (isGameClear) return false;
+                    document.getElementById('boss-bar-fill').style.width = `${(this.hp / this.maxHp) * 100}%`;
+
+                    if (this.hp <= 0) {
+                        document.getElementById('boss-bar-container').style.display = 'none';
+                        for (let i = 0; i < 30; i++) spawnParticle(this.mesh.position, 0xff00ff);
+                        generateReturnPortal();
+                        for (let i = 0; i < 20; i++) {
+                            let rx = Math.floor((Math.random() - 0.5) * 30); let rz = Math.floor((Math.random() - 0.5) * 30);
+                            for (let ry = 40; ry >= 10; ry--) { if (getBlock(rx, ry, rz)) { setBlock(rx, ry + 1, rz, 'end_rod'); break; } }
+                        }
+                        return true;
+                    }
+
+                    const flap = Math.sin(time * 8) * 0.5; this.wings[0].rotation.z = flap; this.wings[1].rotation.z = Math.PI - flap;
+                    this.timer += delta;
+                    if (this.phase === 'circle') {
+                        this.angle += delta * 0.5; const targetX = Math.cos(this.angle) * 30; const targetZ = Math.sin(this.angle) * 30;
+                        const targetPos = new THREE.Vector3(targetX, 50 + Math.sin(time * 2) * 5, targetZ);
+                        this.mesh.position.lerp(targetPos, delta * 2); this.mesh.lookAt(targetPos);
+                        if (this.timer > 10 && Math.random() < 0.05) { this.phase = 'swoop'; this.timer = 0; }
+                    } else if (this.phase === 'swoop') {
+                        const targetPos = camera.position.clone(); targetPos.y += 2;
+                        this.mesh.position.lerp(targetPos, delta * 3); this.mesh.lookAt(targetPos);
+                        if (this.mesh.position.distanceTo(camera.position) < 8) {
+                            if (playerInvulnTimer <= 0 && gameMode === 1) { takeDamage(6); velocity.y = 15; }
+                            this.phase = 'circle'; this.timer = 0;
+                        }
+                        if (this.timer > 5) { this.phase = 'circle'; this.timer = 0; }
+                    }
+                    this.mesh.children.forEach(c => { if (c.material && c.material.emissive && c.material.emissive.r > 0) { c.material.emissive.r = Math.max(0, c.material.emissive.r - delta * 3); } });
+                    return false;
+                }
+            });
+        }
+
+        const particles = [];
+        function spawnParticle(pos, colorHex) {
+            const p = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({ color: colorHex }));
+            p.position.copy(pos); scene.add(p);
+            particles.push({ mesh: p, life: 1.0, vel: new THREE.Vector3((Math.random() - 0.5) * 15, Math.random() * 15, (Math.random() - 0.5) * 15) });
+        }
+
+        // ==========================================
+        // 8. 维度切换与区块生成
+        // ==========================================
+        let lastChunkX = -999; let lastChunkZ = -999;
+
+        function switchDimension(newDim) {
+            dimensionState[currentDimension].playerPos = camera.position.clone();
+            chunks.forEach(c => blockTypes.forEach(t => scene.remove(c.meshes[t])));
+            entities.forEach(e => { scene.remove(e.mesh); if (e.beam) scene.remove(e.beam); });
+            particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
+
+            currentDimension = newDim;
+            chunks = dimensionState[newDim].chunks;
+            worldBlocks = dimensionState[newDim].worldBlocks;
+            entities = dimensionState[newDim].entities;
+
+            chunks.forEach(c => blockTypes.forEach(t => scene.add(c.meshes[t])));
+            entities.forEach(e => { scene.add(e.mesh); if (e.beam) scene.add(e.beam); });
+
+            document.getElementById('biome-display').innerText = `Biome: ${newDim.charAt(0).toUpperCase() + newDim.slice(1)}`;
+            if (newDim === 'overworld') {
+                scene.background = skyColors.overworld; scene.fog.color = skyColors.overworld; scene.fog.near = 40; scene.fog.far = 80;
+                ambientLight.intensity = 0.6; directionalLight.intensity = 0.8;
+            } else if (newDim === 'nether') {
+                scene.background = skyColors.nether; scene.fog.color = skyColors.nether; scene.fog.near = 5; scene.fog.far = 30;
+                ambientLight.intensity = 0.8; directionalLight.intensity = 0;
+            } else if (newDim === 'end') {
+                scene.background = skyColors.end; scene.fog.color = skyColors.end; scene.fog.near = 40; scene.fog.far = 100;
+                ambientLight.intensity = 0.4; directionalLight.intensity = 0.2;
+                if (entities.filter(e => e.type === 'dragon').length === 0 && !isGameClear) setTimeout(() => spawnEnderDragon(), 2000);
+            }
+
+            if (dimensionState[newDim].playerPos) {
+                camera.position.copy(dimensionState[newDim].playerPos);
+            } else {
+                if (newDim === 'overworld') camera.position.set(0, 20, 0);
+                if (newDim === 'nether') camera.position.set(0, 32, 2.5);
+                if (newDim === 'end') camera.position.set(0, 40, 30);
+            }
+
+            lastChunkX = -999; updateChunks();
+            velocity.set(0, 0, 0);
+        }
+
+        function generateChunk(cx, cz) {
+            const key = `${cx},${cz}`; if (chunks.has(key)) return;
+
+            const meshes = {}; const counts = {};
+            for (const type of blockTypes) { meshes[type] = new THREE.InstancedMesh(blockGeometry, materials[type], maxBlocksPerType[type]); meshes[type].frustumCulled = false; counts[type] = 0; }
+            const blocks = new Map(); const dummy = new THREE.Object3D();
+
+            function addBlock(bx, by, bz, type) {
+                if (counts[type] >= maxBlocksPerType[type]) return;
+                const posKey = `${bx},${by},${bz}`; if (blocks.has(posKey)) return;
+                blocks.set(posKey, type); if (type !== 'tall_grass' && type !== 'end_portal_frame_empty' && type !== 'nether_portal' && type !== 'water' && type !== 'lava' && type !== 'end_rod') worldBlocks.add(posKey);
+                dummy.position.set(bx + 0.5, by + 0.5, bz + 0.5); dummy.updateMatrix(); meshes[type].setMatrixAt(counts[type]++, dummy.matrix);
+            }
+
+            const END_PILLARS = [
+                { x: 18, z: 0, h: 10 }, { x: 13, z: 13, h: 15 }, { x: 0, z: 18, h: 20 }, { x: -13, z: 13, h: 25 },
+                { x: -18, z: 0, h: 10 }, { x: -13, z: -13, h: 15 }, { x: 0, z: -18, h: 20 }, { x: 13, z: -13, h: 25 }
+            ];
+
+            for (let x = 0; x < chunkSize; x++) {
+                for (let z = 0; z < chunkSize; z++) {
+                    const wx = cx * chunkSize + x; const wz = cz * chunkSize + z;
+
+                    if (currentDimension === 'overworld') {
+                        const surfaceY = Math.floor(noise2D(wx * 0.04, wz * 0.04) * 5); const bottomY = -64;
+
+                        for (let y = bottomY; y <= surfaceY; y++) {
+                            let isCave = false;
+                            if (y < surfaceY - 4 && y > bottomY + 2) { if (noise3D(wx * 0.05, y * 0.05, wz * 0.05) > 0.25) isCave = true; }
+
+                            if (wx >= 60 && wx <= 68 && wz >= 60 && wz <= 68 && y >= -25 && y <= -20) {
+                                if (wx === 60 || wx === 68 || wz === 60 || wz === 68 || y === -25 || y === -20) {
+                                    addBlock(wx, y, wz, 'stone_brick');
+                                } else {
+                                    if (y === -24) {
+                                        if ((wz === 62 || wz === 66) && wx >= 63 && wx <= 65) addBlock(wx, y, wz, 'end_portal_frame_empty');
+                                        if ((wx === 62 || wx === 66) && wz >= 63 && wz <= 65) addBlock(wx, y, wz, 'end_portal_frame_empty');
+                                    }
+                                }
+                                continue;
+                            }
+
+                            if (isCave) continue;
+                            let type = 'stone';
+                            if (y === bottomY || y === bottomY + 1) type = 'bedrock';
+                            else if (surfaceY <= 0 && y === surfaceY) type = 'sand'; else if (y === surfaceY) type = 'grass'; else if (y > surfaceY - 3) type = 'dirt';
+                            else if (y < surfaceY - 3) {
+                                if (Math.random() < 0.04) {
+                                    const r = Math.random(); if (y < -40 && r < 0.05) type = 'diamond_ore'; else if (y < -20 && r < 0.15) type = 'gold_ore'; else if (y < 0 && r < 0.4) type = 'iron_ore'; else type = 'coal_ore';
+                                }
+                            }
+                            addBlock(wx, y, wz, type);
+                        }
+
+                        if (surfaceY < 0) {
+                            for (let wy = Math.max(bottomY + 1, surfaceY + 1); wy <= 0; wy++) {
+                                addBlock(wx, wy, wz, 'water');
+                            }
+                        }
+
+                        if (surfaceY >= -10 && x >= 2 && x <= 13 && z >= 2 && z <= 13) {
+                            if (Math.random() < 0.015 && surfaceY > 0) {
+                                const trunkHeight = 4 + Math.floor(Math.random() * 2);
+                                for (let ty = 1; ty <= trunkHeight; ty++) addBlock(wx, surfaceY + ty, wz, 'log');
+                                for (let lx = -2; lx <= 2; lx++) { for (let lz = -2; lz <= 2; lz++) { for (let ly = trunkHeight - 2; ly <= trunkHeight + 1; ly++) { if (Math.abs(lx) + Math.abs(lz) + Math.abs(ly - trunkHeight) <= 3) { if (lx === 0 && lz === 0 && ly <= trunkHeight) continue; addBlock(wx + lx, surfaceY + ly, wz + lz, 'leaves'); } } } }
+                            } else if (Math.random() < 0.08 && surfaceY > 0) { addBlock(wx, surfaceY + 1, wz, 'tall_grass'); }
+                        }
+                    } else if (currentDimension === 'nether') {
+                        const isPortalArea = (wx >= -3 && wx <= 3 && wz >= -3 && wz <= 3);
+
+                        for (let y = 0; y <= 64; y++) {
+                            if (isPortalArea && y >= 31 && y <= 36) {
+                                if (y === 31) addBlock(wx, y, wz, 'obsidian');
+                                else if (wx >= -1 && wx <= 2 && wz === 0 && y >= 32 && y <= 35) {
+                                    if (wx === -1 || wx === 2 || y === 35) addBlock(wx, y, wz, 'obsidian');
+                                    else addBlock(wx, y, wz, 'nether_portal');
+                                }
+                                continue;
+                            }
+
+                            const n = noise3D(wx * 0.03, y * 0.03, wz * 0.03);
+                            if (n > -0.05 || y >= 60 || y <= 4) {
+                                if (y === 0 || y >= 60) {
+                                    addBlock(wx, y, wz, 'bedrock');
+                                } else {
+                                    if (noise3D(wx * 0.1, (y + 1) * 0.1, wz * 0.1) > 0.3 && y < 50 && Math.random() < 0.15) {
+                                        addBlock(wx, y, wz, 'magma');
+                                    } else {
+                                        addBlock(wx, y, wz, 'netherrack');
+                                    }
+                                }
+                            } else if (y <= 12) {
+                                addBlock(wx, y, wz, 'lava');
+                            }
+                        }
+                    } else if (currentDimension === 'end') {
+                        const dist = Math.sqrt(wx * wx + wz * wz);
+                        if (dist < 40) {
+                            const depth = Math.floor(20 - dist / 2);
+                            for (let y = 0; y > -depth; y--) { addBlock(wx, 20 + y, wz, 'end_stone'); }
+                        }
+
+                        for (let p of END_PILLARS) {
+                            if (Math.abs(wx - p.x) <= 1 && Math.abs(wz - p.z) <= 1) {
+                                for (let hy = 1; hy <= p.h; hy++) { addBlock(wx, 20 + hy, wz, 'obsidian'); }
+                                if (wx === p.x && wz === p.z) {
+                                    spawnEnderCrystal(p.x + 0.5, 20 + p.h + 1, p.z + 0.5);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const type of blockTypes) {
+                meshes[type].count = counts[type];
+                if (counts[type] > 0) meshes[type].computeBoundingSphere();
+                scene.add(meshes[type]);
+            }
+            chunks.set(key, { meshes, blocks, cx, cz });
+        }
+
+        function unloadChunk(key) {
+            const chunk = chunks.get(key); if (!chunk) return;
+            for (const type of blockTypes) { scene.remove(chunk.meshes[type]); chunk.meshes[type].dispose(); }
+            for (const posKey of chunk.blocks.keys()) worldBlocks.delete(posKey); chunks.delete(key);
+        }
+
+        function updateChunks() {
+            const camPos = camera.position;
+            const cx = Math.floor(camPos.x / chunkSize); const cz = Math.floor(camPos.z / chunkSize);
+            if (cx === lastChunkX && cz === lastChunkZ) return;
+            lastChunkX = cx; lastChunkZ = cz; const expectedChunks = new Set();
+
+            const viewDistance = 3;
+            // 渐进式加载：优先加载距离近的区块
+            const chunksToLoad = [];
+            for (let dx = -viewDistance; dx <= viewDistance; dx++) {
+                for (let dz = -viewDistance; dz <= viewDistance; dz++) {
+                    const targetCx = cx + dx; const targetCz = cz + dz;
+                    const key = `${targetCx},${targetCz}`;
+                    expectedChunks.add(key);
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    chunksToLoad.push({ cx: targetCx, cz: targetCz, key, distance });
+                }
+            }
+
+            // 按距离排序，先加载近的
+            chunksToLoad.sort((a, b) => a.distance - b.distance);
+
+            // 限制每帧加载的区块数量，避免卡顿
+            const loadPerFrame = 2;
+            for (let i = 0; i < Math.min(chunksToLoad.length, loadPerFrame); i++) {
+                const chunk = chunksToLoad[i];
+                if (!chunks.has(chunk.key)) {
+                    generateChunk(chunk.cx, chunk.cz);
+                }
+            }
+
+            for (const key of chunks.keys()) { if (!expectedChunks.has(key)) unloadChunk(key); }
+        }
+
+        function rebuildChunkMesh(chunk) {
+            const counts = {}; for (const type of blockTypes) counts[type] = 0; const dummy = new THREE.Object3D();
+            for (const [posKey, type] of chunk.blocks.entries()) {
+                if (counts[type] >= maxBlocksPerType[type]) continue;
+                const [bx, by, bz] = posKey.split(',').map(Number);
+                dummy.position.set(bx + 0.5, by + 0.5, bz + 0.5); dummy.updateMatrix(); chunk.meshes[type].setMatrixAt(counts[type]++, dummy.matrix);
+            }
+            for (const type of blockTypes) {
+                chunk.meshes[type].count = counts[type];
+                chunk.meshes[type].instanceMatrix.needsUpdate = true;
+                if (counts[type] > 0) chunk.meshes[type].computeBoundingSphere();
+            }
+        }
+
+        function generateReturnPortal() {
+            const cx = 0; const cz = 0; const cKey = `${cx},${cz}`;
+            let chunk = chunks.get(cKey);
+            if (!chunk) return;
+            for (let x = -2; x <= 2; x++) {
+                for (let z = -2; z <= 2; z++) {
+                    const k = `${x},21,${z}`;
+                    if (Math.abs(x) === 2 || Math.abs(z) === 2) { chunk.blocks.set(k, 'bedrock'); worldBlocks.add(k); }
+                    else { chunk.blocks.set(k, 'return_portal'); }
+                }
+            }
+            rebuildChunkMesh(chunk);
+        }
+
+        updateChunks();
+
+        // ==========================================
+        // 9. 视角交互与操作监听
+        // ==========================================
+        const raycaster = new THREE.Raycaster(); raycaster.far = 5; const center = new THREE.Vector2(0, 0);
+        const highlightGeo = new THREE.BoxGeometry(1.005, 1.005, 1.005); const highlightMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+        const highlightBox = new THREE.LineSegments(new THREE.EdgesGeometry(highlightGeo), highlightMat); highlightBox.visible = false; scene.add(highlightBox);
+
+        const controls = new PointerLockControls(camera, document.body);
+        const blocker = document.getElementById('blocker'); const instructions = document.getElementById('instructions'); const inventoryUiEl = document.getElementById('inventory-ui');
+        const debugUiEl = document.getElementById('debug-ui');
+        const chatContainer = document.getElementById('chat-container');
+        const chatInput = document.getElementById('chat-input');
+
+        instructions.addEventListener('click', () => { if (!isInventoryOpen && !isDead && !isGameClear && !isChatOpen) controls.lock(); });
+
+        controls.addEventListener('lock', () => {
+            if (isInventoryOpen) {
+                for (let i = 0; i < 9; i++) { if (invState.crafting[i]) { addBlockToInventory(invState.crafting[i].type, invState.crafting[i].count); invState.crafting[i] = null; } }
+                invState.output = null;
+                if (invState.dragged) { addBlockToInventory(invState.dragged.type, invState.dragged.count); invState.dragged = null; }
+            }
+            isInventoryOpen = false; instructions.style.display = 'none'; blocker.style.display = 'none'; inventoryUiEl.style.display = 'none'; deathScreenEl.style.display = 'none';
+            document.getElementById('crosshair').style.display = 'block'; hotbarEl.style.display = 'flex'; heldItemGroup.visible = true;
+            if (gameMode !== 0) document.getElementById('status-bars').style.display = 'flex';
+            debugUiEl.style.display = 'block';
+            renderInventoryUI();
+        });
+
+        controls.addEventListener('unlock', () => {
+            if (isGameClear || isChatOpen) return;
+            heldItemGroup.visible = false; isMining = false; document.getElementById('status-bars').style.display = 'none';
+            debugUiEl.style.display = 'none';
+            if (isDead) { deathScreenEl.style.display = 'flex'; blocker.style.display = 'none'; document.getElementById('crosshair').style.display = 'none'; hotbarEl.style.display = 'none'; inventoryUiEl.style.display = 'none'; }
+            else if (isInventoryOpen) { inventoryUiEl.style.display = 'flex'; hotbarEl.style.display = 'flex'; blocker.style.display = 'none'; document.getElementById('crosshair').style.display = 'none'; }
+            else { blocker.style.display = 'flex'; instructions.style.display = ''; document.getElementById('crosshair').style.display = 'none'; hotbarEl.style.display = 'none'; }
+        });
+        scene.add(controls.getObject());
+
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        let isMining = false; let miningTime = 0; let targetBlockKey = null;
+
+        document.addEventListener('wheel', (e) => {
+            if (!controls.isLocked) return;
+            if (e.deltaY > 0) currentSlotIndex = (currentSlotIndex + 1) % 9; else currentSlotIndex = (currentSlotIndex - 1 + 9) % 9;
+            renderInventoryUI();
+            const activeSlot = document.getElementById(`hotbar-${currentSlotIndex}`);
+            if (activeSlot) hotbarEl.scrollTo({ left: activeSlot.offsetLeft - hotbarEl.offsetWidth / 2 + 24, behavior: 'smooth' });
+        });
+
+        document.addEventListener('mousedown', (event) => {
+            if (isInventoryOpen) {
+                const slotEl = event.target.closest('.slot');
+                if (slotEl && slotEl.id !== 'dragged-icon') handleSlotClick(slotEl.getAttribute('data-container'), parseInt(slotEl.getAttribute('data-index')), event.button);
+                return;
+            }
+
+            if (!controls.isLocked || isDead || isGameClear) return;
+
+            const activeItem = invState.hotbar[currentSlotIndex];
+
+            if (event.button === 0 && gameMode === 0) {
+                raycaster.setFromCamera(center, camera);
+                const activeMeshes = [];
+                for (const chunk of chunks.values()) blockTypes.forEach(t => { if (chunk.meshes[t].count > 0) activeMeshes.push(chunk.meshes[t]); });
+                const intersects = raycaster.intersectObjects(activeMeshes);
+                if (intersects.length > 0) {
+                    const intersect = intersects[0];
+                    const p = intersect.point.clone().sub(intersect.face.normal.clone().multiplyScalar(0.1));
+                    setBlock(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z), null);
+                    actionType = 'swing'; actionTimer = 0.3;
+                }
+                return;
+            }
+
+            raycaster.setFromCamera(center, camera);
+            const activeMeshes = [];
+            for (const chunk of chunks.values()) { blockTypes.forEach(type => { if (type !== 'water' && type !== 'lava' && chunk.meshes[type].count > 0) activeMeshes.push(chunk.meshes[type]); }); }
+
+            const mobMeshes = [];
+            entities.forEach(e => { if (e.mesh && e.mesh.children) mobMeshes.push(...e.mesh.children); });
+            const intersects = raycaster.intersectObjects([...activeMeshes, ...mobMeshes]);
+
+            if (event.button === 2) {
+                if (intersects.length > 0 && !mobMeshes.includes(intersects[0].object)) {
+                    const intersect = intersects[0]; const p = intersect.point.clone().sub(intersect.face.normal.clone().multiplyScalar(0.1));
+                    if (getBlock(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)) === 'crafting_table') {
+                        craftingMode = 3; isInventoryOpen = true; controls.unlock(); return;
+                    }
+                }
+
+                if (!activeItem || activeItem.count <= 0) return;
+
+                if (activeItem.type === 'bow') {
+                    let hasArrow = (gameMode === 0); let arrowSlot = -1; let arrowContainer = null;
+                    if (!hasArrow) {
+                        for (let i = 0; i < 9; i++) if (invState.hotbar[i] && invState.hotbar[i].type === 'arrow') { hasArrow = true; arrowSlot = i; arrowContainer = invState.hotbar; break; }
+                        if (!hasArrow) for (let i = 0; i < 45; i++) if (invState.main[i] && invState.main[i].type === 'arrow') { hasArrow = true; arrowSlot = i; arrowContainer = invState.main; break; }
+                    }
+                    if (hasArrow) {
+                        actionType = 'swing'; actionTimer = 0.3;
+                        spawnArrow(camera.position, raycaster.ray.direction);
+                        if (gameMode !== 0 && arrowContainer) { arrowContainer[arrowSlot].count--; if (arrowContainer[arrowSlot].count <= 0) arrowContainer[arrowSlot] = null; }
+                        renderInventoryUI();
+                    }
+                    return;
+                }
+
+                if (ITEMS[activeItem.type] && ITEMS[activeItem.type].type === 'food') {
+                    if (currentHunger < 20) {
+                        currentHunger = Math.min(20, currentHunger + ITEMS[activeItem.type].hungerRestore); updateStatusUI();
+                        if (gameMode !== 0) { activeItem.count--; if (activeItem.count <= 0) invState.hotbar[currentSlotIndex] = null; }
+                        renderInventoryUI(); actionType = 'eat'; actionTimer = 0.5;
+                    } return;
+                }
+
+                if (intersects.length > 0 && !mobMeshes.includes(intersects[0].object)) {
+                    const intersect = intersects[0]; const placeType = activeItem.type;
+                    const p = intersect.point.clone().sub(intersect.face.normal.clone().multiplyScalar(0.1));
+                    const bx = Math.floor(p.x); const by = Math.floor(p.y); const bz = Math.floor(p.z);
+
+                    if (getBlock(bx, by, bz) === 'end_portal_frame_empty' && activeItem.type === 'ender_eye') {
+                        setBlock(bx, by, bz, 'end_portal_frame_filled');
+                        if (gameMode !== 0) { activeItem.count--; if (activeItem.count <= 0) invState.hotbar[currentSlotIndex] = null; }
+                        renderInventoryUI();
+
+                        let filledCount = 0;
+                        for (let ix = 62; ix <= 66; ix++) for (let iz = 62; iz <= 66; iz++) if (getBlock(ix, by, iz) === 'end_portal_frame_filled') filledCount++;
+                        if (filledCount >= 12) {
+                            for (let ix = 63; ix <= 65; ix++) for (let iz = 63; iz <= 65; iz++) setBlock(ix, by, iz, 'end_portal');
+                        }
+                        return;
+                    }
+
+                    if (placeType === 'flint_and_steel' && getBlock(bx, by, bz) === 'obsidian') {
+                        actionType = 'swing'; actionTimer = 0.3;
+                        if (intersect.face.normal.y > 0.5) {
+                            for (let dy = 1; dy <= 3; dy++) setBlock(bx, by + dy, bz, 'nether_portal');
+                        } else {
+                            const nx = bx + Math.round(intersect.face.normal.x);
+                            const ny = by + Math.round(intersect.face.normal.y);
+                            const nz = bz + Math.round(intersect.face.normal.z);
+                            for (let dy = 0; dy <= 2; dy++) setBlock(nx, ny + dy, nz, 'nether_portal');
+                        }
+                        return;
+                    }
+
+                    if (ITEMS[placeType].type === 'block') {
+                        const newBx = bx + Math.round(intersect.face.normal.x); const newBy = by + Math.round(intersect.face.normal.y); const newBz = bz + Math.round(intersect.face.normal.z);
+                        const newBlock = getBlock(newBx, newBy, newBz);
+
+                        const camPos = camera.position; const epsilon = 0.001;
+                        const pMinX = camPos.x - 0.28 + epsilon; const pMaxX = camPos.x + 0.28 - epsilon; const pMinY = camPos.y - 1.55 + epsilon; const pMaxY = camPos.y + 0.19 - epsilon; const pMinZ = camPos.z - 0.28 + epsilon; const pMaxZ = camPos.z + 0.28 - epsilon;
+                        const bMinX = newBx; const bMaxX = newBx + 1; const bMinY = newBy; const bMaxY = newBy + 1; const bMinZ = newBz; const bMaxZ = newBz + 1;
+                        const playerIntersecting = !(pMaxX <= bMinX || pMinX >= bMaxX || pMaxY <= bMinY || pMinY >= bMaxY || pMaxZ <= bMinZ || pMinZ >= bMaxZ);
+
+                        if ((!newBlock || newBlock === 'water' || newBlock === 'lava') && (!playerIntersecting || placeType === 'tall_grass')) {
+                            setBlock(newBx, newBy, newBz, placeType);
+                            if (gameMode !== 0) { activeItem.count--; if (activeItem.count <= 0) invState.hotbar[currentSlotIndex] = null; }
+                            renderInventoryUI();
+                        }
+                        return;
+                    }
+                }
+
+                if (activeItem.type === 'ender_eye' && currentDimension === 'overworld') {
+                    actionType = 'swing'; actionTimer = 0.3;
+                    spawnEnderEyeEntity(camera.position.x, camera.position.y, camera.position.z);
+                    if (gameMode !== 0) { activeItem.count--; if (activeItem.count <= 0) invState.hotbar[currentSlotIndex] = null; }
+                    renderInventoryUI(); return;
+                }
+            }
+            else if (event.button === 0) {
+                actionType = 'swing'; actionTimer = 0.3;
+
+                if (intersects.length > 0) {
+                    const intersect = intersects[0];
+                    let hitMob = null;
+
+                    for (let e of entities) { if (e.mesh && e.mesh.children && e.mesh.children.includes(intersect.object)) { hitMob = e; break; } }
+
+                    if (hitMob) {
+                        let dmg = (gameMode === 0) ? 999 : 2;
+                        const activeItem = invState.hotbar[currentSlotIndex];
+                        if (activeItem && ITEMS[activeItem.type]) {
+                            if (ITEMS[activeItem.type].toolType === 'pickaxe') dmg += ITEMS[activeItem.type].tier * 3;
+                            if (ITEMS[activeItem.type].toolType === 'bow') dmg += 3;
+                        }
+
+                        hitMob.hp -= dmg;
+
+                        if (hitMob.type === 'enderman') {
+                            if (hitMob.onHit) hitMob.onHit();
+                            hitMob.mesh.children.forEach(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0xaa0000); });
+                        } else if (hitMob.type === 'dragon') {
+                            hitMob.mesh.children.forEach(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0xaa0000); });
+                        } else if (hitMob.type === 'crystal') {
+                            hitMob.hp = 0;
+                        } else {
+                            hitMob.mesh.children.forEach(c => { if (c.material && c.material.emissive) c.material.emissive.setHex(0xaa0000); });
+                            const kb = new THREE.Vector3().subVectors(hitMob.mesh.position, camera.position).normalize();
+                            if (hitMob.type === 'pig') { hitMob.target.copy(hitMob.mesh.position).addScaledVector(kb, 3); hitMob.state = 'wander'; hitMob.timer = 2; }
+                            else if (hitMob.type === 'zombie' || hitMob.type === 'blaze' || hitMob.type === 'spider') { hitMob.mesh.position.addScaledVector(kb, 1); }
+                        }
+
+                        if (hitMob.hp <= 0 && hitMob.type !== 'dragon' && hitMob.type !== 'crystal') {
+                            scene.remove(hitMob.mesh); entities.splice(entities.indexOf(hitMob), 1);
+                            if (hitMob.type === 'pig' && gameMode === 1) addBlockToInventory('raw_porkchop', 1);
+                            else if (hitMob.type === 'zombie' && gameMode === 1) addBlockToInventory('rotten_flesh', 1);
+                            else if (hitMob.type === 'enderman' && gameMode === 1) addBlockToInventory('ender_pearl', 1);
+                            else if (hitMob.type === 'blaze' && gameMode === 1) addBlockToInventory('blaze_rod', Math.floor(Math.random() * 2) + 2);
+                            else if (hitMob.type === 'spider' && gameMode === 1) addBlockToInventory('string', Math.floor(Math.random() * 2) + 5);
+                            renderInventoryUI();
+                        }
+                        return;
+                    }
+
+                    const p = intersect.point.clone().sub(intersect.face.normal.clone().multiplyScalar(0.1));
+                    const bx = Math.floor(p.x); const by = Math.floor(p.y); const bz = Math.floor(p.z);
+                    const bt = getBlock(bx, by, bz);
+                    if (bt === 'end_portal' || bt === 'nether_portal' || bt === 'return_portal' || bt === 'end_portal_frame_empty') return;
+
+                    isMining = true; miningTime = 0;
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', (event) => {
+            if (event.button === 0) { isMining = false; miningTime = 0; highlightBox.scale.setScalar(1); highlightMat.color.setHex(0x000000); }
+        });
+
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+
+        const onKeyDown = function (event) {
+            if (isGameClear) {
+                if (event.code === 'Space' || event.code === 'Escape') {
+                    isGameClear = false; document.getElementById('win-screen').style.display = 'none';
+                    if (winScroller) clearInterval(winScroller); document.getElementById('credits-content').style.transform = `translateY(0px)`;
+
+                    switchDimension('overworld');
+                    camera.position.set(0, 100, 0);
+                    dimensionState.overworld.playerPos = camera.position.clone();
+                    velocity.set(0, 0, 0); highestY = 100; isFalling = false; isFlying = false;
+                    isSpawnImmunity = true; playerInvulnTimer = 2.0; jumpPressed = false;
+                    controls.lock();
+                }
+                return;
+            }
+
+            if (isDead) return;
+
+            if (event.code === 'KeyT' || event.code === 'Slash') {
+                if (controls.isLocked) {
+                    controls.unlock(); isChatOpen = true; chatContainer.style.display = 'block'; chatInput.focus();
+                    if (event.code === 'Slash') chatInput.value = '/'; else event.preventDefault(); return;
+                }
+            }
+            if (isChatOpen) {
+                if (event.code === 'Enter') {
+                    if (chatInput.value.trim() !== '') handleCommand(chatInput.value);
+                    chatInput.value = ''; chatContainer.style.display = 'none'; isChatOpen = false; controls.lock();
+                } else if (event.code === 'Escape') {
+                    chatInput.value = ''; chatContainer.style.display = 'none'; isChatOpen = false; controls.lock();
+                } else if (event.code === 'Tab') {
+                    event.preventDefault();
+                    const value = chatInput.value.trim();
+                    const parts = value.split(' ');
+
+                    if (parts.length === 1) {
+                        // 补全命令
+                        const commands = ['/gamemode', '/help', '/give', '/recipebook', '/save', '/clear', '/tp', '/heal', '/feed', '/time'];
+                        if (value.startsWith('/')) {
+                            const matches = commands.filter(cmd => cmd.startsWith(value.toLowerCase()));
+                            if (matches.length === 1) {
+                                chatInput.value = matches[0] + ' ';
+                            } else if (matches.length > 1) {
+                                appendChat('可能的指令: ' + matches.join(', '));
+                            }
+                        }
+                    } else if (parts[0].toLowerCase() === '/give' && parts.length === 2) {
+                        // 补全物品名称
+                        const partial = parts[1].toLowerCase();
+                        const matches = allItemTypes.filter(item => item.toLowerCase().startsWith(partial));
+                        if (matches.length === 1) {
+                            chatInput.value = parts[0] + ' ' + matches[0] + ' ';
+                        } else if (matches.length > 1) {
+                            appendChat('可能的物品: ' + matches.slice(0, 10).join(', ') + (matches.length > 10 ? '...' : ''));
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (event.code === 'KeyE') {
+                if (controls.isLocked) {
+                    craftingMode = 2;
+                    if (gameMode === 0) {
+                        for (let i = 0; i < allItemTypes.length && i < 45; i++) invState.main[i] = { type: allItemTypes[i], count: 64 };
+                    }
+                    isInventoryOpen = true; controls.unlock();
+                } else if (isInventoryOpen) { controls.lock(); } return;
+            }
+            if (isInventoryOpen) return;
+
+            if (event.code.startsWith('Digit')) {
+                const digit = parseInt(event.code.replace('Digit', ''));
+                if (digit >= 1 && digit <= 9) { currentSlotIndex = digit - 1; renderInventoryUI(); }
+            }
+
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                case 'ArrowRight': case 'KeyD': moveRight = true; break;
+                case 'Space':
+                    jumpPressed = true;
+                    const now = performance.now();
+                    // 只在创造模式下且没有按住W键时才切换飞行
+                    if (now - lastSpacePress < 300 && gameMode === 0 && !moveForward && !moveBackward && !moveLeft && !moveRight) {
+                        isFlying = !isFlying;
+                        velocity.y = 0;
+                        appendChat(isFlying ? '飞行模式: 开启' : '飞行模式: 关闭');
+                    }
+                    lastSpacePress = now;
+                    break;
+                case 'ShiftLeft': case 'ShiftRight': shiftPressed = true; break;
+            }
+        };
+
+        const onKeyUp = function (event) {
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                case 'ArrowRight': case 'KeyD': moveRight = false; break;
+                case 'Space': jumpPressed = false; break;
+                case 'ShiftLeft': case 'ShiftRight': shiftPressed = false; break;
+            }
+        };
+        document.addEventListener('keydown', onKeyDown); document.addEventListener('keyup', onKeyUp);
+
+        // 碰撞检测缓存，避免重复计算
+        const collisionCache = new Map();
+        const cacheExpiry = {};
+        const CACHE_DURATION = 100; // 缓存100ms
+
+        function checkCollisionGeneric(x, y, z, radius, height) {
+            // 生成缓存键
+            const cacheKey = `${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)},${radius},${height}`;
+            const now = performance.now();
+
+            // 检查缓存
+            if (collisionCache.has(cacheKey)) {
+                const cacheTime = cacheExpiry[cacheKey];
+                if (now - cacheTime < CACHE_DURATION) {
+                    return collisionCache.get(cacheKey);
+                }
+            }
+
+            const epsilon = 0.001;
+            const minX = Math.floor(x - radius + epsilon); const maxX = Math.floor(x + radius - epsilon);
+            const minY = Math.floor(y + epsilon); const maxY = Math.floor(y + height - epsilon);
+            const minZ = Math.floor(z - radius + epsilon); const maxZ = Math.floor(z + radius - epsilon);
+
+            let collision = false;
+            for (let i = minX; i <= maxX; i++) {
+                for (let j = minY; j <= Math.min(maxY, 100); j++) {
+                    for (let k = minZ; k <= maxZ; k++) {
+                        const b = getBlock(i, j, k);
+                        if (b && b !== 'nether_portal' && b !== 'end_portal' && b !== 'return_portal' && b !== 'water' && b !== 'lava' && b !== 'tall_grass' && b !== 'end_rod') {
+                            collision = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 更新缓存
+            collisionCache.set(cacheKey, collision);
+            cacheExpiry[cacheKey] = now;
+
+            // 清理过期缓存
+            if (collisionCache.size > 1000) {
+                const oldestKey = Object.keys(cacheExpiry)[0];
+                collisionCache.delete(oldestKey);
+                delete cacheExpiry[oldestKey];
+            }
+
+            return collision;
+        }
+
+        const velocity = new THREE.Vector3(); const direction = new THREE.Vector3(); const clock = new THREE.Clock();
+        let worldTime = 0; let zombieSpawnTimer = 0; let endermanSpawnTimer = 0; let blazeSpawnTimer = 0;
+        let portalTimer = 0;
+
+        const DAY_LENGTH = 300;
+        const NIGHT_LENGTH = 180;
+        const CYCLE_LENGTH = DAY_LENGTH + NIGHT_LENGTH;
+
+        let renderFrames = 0;
+        let lastFpsTime = performance.now();
+        const fpsDisplay = document.getElementById('fps-display');
+        const coordsDisplay = document.getElementById('coords-display');
+        const timeDisplay = document.getElementById('time-display');
+
+        // ==========================================
+        // 10. 终极动画渲染与核心逻辑循环
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            worldTime += delta;
+
+            if (gameStartTime < 3.0) gameStartTime += delta;
+
+            let cycleTime = worldTime % CYCLE_LENGTH;
+            let theta; let timeUntilSwitch = 0; let nextPhase = '';
+
+            if (cycleTime < DAY_LENGTH) {
+                theta = (cycleTime / DAY_LENGTH) * Math.PI;
+                timeUntilSwitch = DAY_LENGTH - cycleTime;
+                nextPhase = '黑夜';
+            } else {
+                theta = Math.PI + ((cycleTime - DAY_LENGTH) / NIGHT_LENGTH) * Math.PI;
+                timeUntilSwitch = CYCLE_LENGTH - cycleTime;
+                nextPhase = '白天';
+            }
+
+            const now = performance.now();
+            renderFrames++;
+            if (now - lastFpsTime >= 1000) {
+                fpsDisplay.innerText = `FPS: ${renderFrames}`;
+                renderFrames = 0;
+                lastFpsTime = now;
+            }
+
+            if (controls.isLocked) {
+                coordsDisplay.innerText = `XYZ: ${camera.position.x.toFixed(1)} / ${camera.position.y.toFixed(1)} / ${camera.position.z.toFixed(1)}`;
+                let min = Math.floor(timeUntilSwitch / 60);
+                let sec = Math.floor(timeUntilSwitch % 60).toString().padStart(2, '0');
+                if (currentDimension === 'overworld') {
+                    timeDisplay.innerText = `离${nextPhase}: ${min}:${sec}`;
+                } else {
+                    timeDisplay.innerText = `当前世界无时间概念`;
+                }
+            }
+
+            directionalLight.position.set(Math.cos(theta) * 100, Math.sin(theta) * 100, Math.sin(theta) * 30);
+            const sunHeight = Math.sin(theta);
+
+            let isPlayerInWater = false; let isPlayerInLava = false;
+
+            if (controls.isLocked === true) {
+                const curBx = Math.floor(camera.position.x);
+                const curBy = Math.floor(camera.position.y - 1);
+                const curByEye = Math.floor(camera.position.y);
+                const curBz = Math.floor(camera.position.z);
+
+                const bFeet = getBlock(curBx, curBy, curBz);
+                const bHead = getBlock(curBx, curByEye, curBz);
+                if (bFeet === 'water' || bHead === 'water') isPlayerInWater = true;
+                if (bFeet === 'lava' || bHead === 'lava') isPlayerInLava = true;
+
+                if (bFeet === 'magma' && !isFlying && gameMode === 1 && playerInvulnTimer <= 0) { takeDamage(1); }
+            }
+
+            if (isPlayerInWater) {
+                scene.fog.color.setHex(0x0055ff); scene.fog.near = 0.1; scene.fog.far = 15; scene.background.setHex(0x0055ff);
+            } else if (isPlayerInLava) {
+                scene.fog.color.setHex(0xff3300); scene.fog.near = 0.1; scene.fog.far = 5; scene.background.setHex(0xff3300);
+            } else {
+                if (currentDimension === 'overworld') {
+                    if (sunHeight > 0.2) { skyCurrent.copy(skyColors.overworld); ambientLight.intensity = 0.6; directionalLight.intensity = 0.8; }
+                    else if (sunHeight > 0) { const t = sunHeight / 0.2; skyCurrent.copy(skyColors.dusk).lerp(skyColors.overworld, t); ambientLight.intensity = 0.2 + 0.4 * t; directionalLight.intensity = 0.8 * t; }
+                    else if (sunHeight > -0.2) { const t = (sunHeight + 0.2) / 0.2; skyCurrent.copy(skyColors.night).lerp(skyColors.dusk, t); ambientLight.intensity = 0.1 + 0.1 * t; directionalLight.intensity = 0; }
+                    else { skyCurrent.copy(skyColors.night); ambientLight.intensity = 0.1; directionalLight.intensity = 0; }
+
+                    const camY = camera.position.y; const targetColor = skyCurrent.clone();
+                    if (camY < 0) {
+                        const depthFactor = Math.min(1, -camY / 30); targetColor.lerp(new THREE.Color(0x020202), depthFactor);
+                        scene.fog.near = 20 - 15 * depthFactor; scene.fog.far = 50 - 30 * depthFactor;
+                    } else { scene.fog.near = 40; scene.fog.far = 80; }
+                    scene.background = targetColor; scene.fog.color = targetColor;
+                }
+            }
+
+            const isNight = sunHeight <= 0.1;
+
+            for (let i = entities.length - 1; i >= 0; i--) {
+                const e = entities[i];
+                if (e.update(delta, worldTime, sunHeight, isNight)) { scene.remove(e.mesh); if (e.beam) scene.remove(e.beam); entities.splice(i, 1); }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= delta; p.mesh.position.addScaledVector(p.vel, delta); p.mesh.scale.setScalar(p.life);
+                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+            }
+
+            if (currentDimension === 'overworld') {
+                zombieSpawnTimer += delta;
+                if (zombieSpawnTimer > 3 && entities.filter(e => e.type === 'zombie' || e.type === 'spider').length < 15) {
+                    zombieSpawnTimer = 0; const angle = Math.random() * Math.PI * 2; const r = 10 + Math.random() * 10;
+                    const sx = camera.position.x + Math.cos(angle) * r; const sz = camera.position.z + Math.sin(angle) * r;
+                    const sSurfaceY = Math.floor(noise2D(sx * 0.04, sz * 0.04) * 5);
+                    if (isNight) {
+                        if (worldBlocks.has(`${Math.floor(sx)},${sSurfaceY},${Math.floor(sz)}`)) {
+                            if (Math.random() < 0.4) spawnSpider(sx, sz, sSurfaceY + 1); else spawnZombie(sx, sz, sSurfaceY + 1);
+                        }
+                    }
+                    else if (camera.position.y < 0) {
+                        const cy = camera.position.y + (Math.random() - 0.5) * 10;
+                        if (!worldBlocks.has(`${Math.floor(sx)},${Math.floor(cy)},${Math.floor(sz)}`) && worldBlocks.has(`${Math.floor(sx)},${Math.floor(cy) - 1},${Math.floor(sz)}`)) {
+                            if (Math.random() < 0.3) spawnSpider(sx, sz, cy); else spawnZombie(sx, sz, cy);
+                        }
+                    }
+                }
+
+                endermanSpawnTimer += delta;
+                if (endermanSpawnTimer > 5 && isNight && entities.filter(e => e.type === 'enderman').length < 3) {
+                    endermanSpawnTimer = 0; const angle = Math.random() * Math.PI * 2; const r = 15 + Math.random() * 10;
+                    const sx = camera.position.x + Math.cos(angle) * r; const sz = camera.position.z + Math.sin(angle) * r;
+                    const sSurfaceY = Math.floor(noise2D(sx * 0.04, sz * 0.04) * 5);
+                    if (worldBlocks.has(`${Math.floor(sx)},${sSurfaceY},${Math.floor(sz)}`)) spawnEnderman(sx, sz, sSurfaceY + 1);
+                }
+            } else if (currentDimension === 'nether') {
+                // 【强化：烈焰人生成速率大幅提高】
+                blazeSpawnTimer += delta;
+                if (blazeSpawnTimer > 2.5 && entities.filter(e => e.type === 'blaze' || e.type === 'zombie').length < 25) {
+                    blazeSpawnTimer = 0; const angle = Math.random() * Math.PI * 2; const r = 10 + Math.random() * 15;
+                    const sx = camera.position.x + Math.cos(angle) * r; const sz = camera.position.z + Math.sin(angle) * r;
+                    for (let cy = Math.floor(camera.position.y) + 5; cy > Math.floor(camera.position.y) - 10; cy--) {
+                        if (!getBlock(Math.floor(sx), cy, Math.floor(sz)) && getBlock(Math.floor(sx), cy - 1, Math.floor(sz))) {
+                            if (Math.random() < 0.75) spawnBlaze(sx, sz, cy); // 75% 概率生成烈焰人
+                            else spawnZombie(sx, sz, cy);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (playerInvulnTimer > 0) playerInvulnTimer -= delta;
+
+            if (controls.isLocked === true && !isInventoryOpen && !isDead && !isGameClear) {
+                updateChunks();
+
+                hungerTimer += delta;
+                if (hungerTimer > 10 && gameMode === 1) { hungerTimer = 0; if (currentHunger > 0) { currentHunger = Math.max(0, currentHunger - 0.5); updateStatusUI(); } }
+                if (currentHunger >= 18 && currentHealth < 20) { healTimer += delta; if (healTimer > 4) { healTimer = 0; currentHealth++; updateStatusUI(); } } else healTimer = 0;
+                if (currentHunger <= 0) { starveTimer += delta; if (starveTimer > 4) { starveTimer = 0; takeDamage(1); } } else starveTimer = 0;
+
+                let speedMult = 1.0;
+                if (isPlayerInWater) speedMult = 0.5;
+                if (isPlayerInLava) { speedMult = 0.3; if (playerInvulnTimer <= 0) takeDamage(2); }
+
+                velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta;
+
+                if (isFlying) {
+                    velocity.y -= velocity.y * 10.0 * delta;
+                    if (jumpPressed) velocity.y += 60.0 * delta;
+                    if (shiftPressed) velocity.y -= 60.0 * delta;
+                    speedMult = 2.5;
+                } else {
+                    if (isPlayerInWater || isPlayerInLava) {
+                        velocity.y -= 5.0 * delta;
+                        if (velocity.y < -3.0) velocity.y = -3.0;
+                    } else {
+                        velocity.y -= 25.0 * delta;
+                    }
+                }
+
+                direction.z = Number(moveForward) - Number(moveBackward); direction.x = Number(moveRight) - Number(moveLeft); direction.normalize();
+
+                const speed = 40.0 * speedMult;
+                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+                if (jumpPressed && !isFlying) {
+                    if (canJump) {
+                        velocity.y = 8.5; canJump = false;
+                        if (currentHunger > 0 && gameMode === 1) { currentHunger = Math.max(0, currentHunger - 0.2); updateStatusUI(); }
+                    } else if (isPlayerInWater || isPlayerInLava) {
+                        velocity.y += 35.0 * delta;
+                        if (velocity.y > 6.0) velocity.y = 6.0;
+                    }
+                }
+
+                const camObj = controls.getObject(); const oldPos = camObj.position.clone();
+                camObj.position.copy(oldPos);
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+                const totalDx = camObj.position.x - oldPos.x;
+                const totalDz = camObj.position.z - oldPos.z;
+
+                camObj.position.copy(oldPos);
+
+                if (velocity.y < 0 && !checkCollisionGeneric(camObj.position.x, camObj.position.y - 1.55, camObj.position.z, 0.28, 1.7)) { highestY = Math.max(highestY, camObj.position.y); isFalling = true; } else if (velocity.y > 0) { highestY = camObj.position.y; isFalling = false; }
+                camObj.position.y += velocity.y * delta;
+                if (checkCollisionGeneric(camObj.position.x, camObj.position.y - 1.55, camObj.position.z, 0.28, 1.7)) {
+                    if (velocity.y < 0) {
+                        camObj.position.y = Math.floor(camObj.position.y - 1.55) + 1 + 1.55;
+                        if (isFalling && !isFlying) { const fallDist = highestY - camObj.position.y; if (fallDist > 4 && gameStartTime >= 3.0 && !isSpawnImmunity && !isPlayerInWater && !isPlayerInLava) { takeDamage(Math.floor(fallDist - 3)); } highestY = camObj.position.y; isFalling = false; isSpawnImmunity = false; }
+                    } else { camObj.position.y -= velocity.y * delta; }
+                    velocity.y = 0;
+                }
+                canJump = checkCollisionGeneric(camObj.position.x, camObj.position.y - 1.55 - 0.05, camObj.position.z, 0.28, 0.1);
+
+                const moveSteps = Math.min(Math.ceil(Math.max(Math.abs(totalDx), Math.abs(totalDz)) / 0.1), 10) || 1;
+                const stepX = totalDx / moveSteps;
+                const stepZ = totalDz / moveSteps;
+
+                for (let s = 0; s < moveSteps; s++) {
+                    camObj.position.x += stepX;
+                    if (checkCollisionGeneric(camObj.position.x, camObj.position.y - 1.55 + 0.01, camObj.position.z, 0.28, 1.7)) { camObj.position.x -= stepX; velocity.x = 0; }
+                    camObj.position.z += stepZ;
+                    if (checkCollisionGeneric(camObj.position.x, camObj.position.y - 1.55 + 0.01, camObj.position.z, 0.28, 1.7)) { camObj.position.z -= stepZ; velocity.z = 0; }
+                }
+
+                const curBx = Math.floor(camObj.position.x); const curBy = Math.floor(camObj.position.y - 1); const curBz = Math.floor(camObj.position.z);
+                const blockInside = getBlock(curBx, curBy, curBz) || getBlock(curBx, Math.floor(camObj.position.y), curBz);
+
+                if (blockInside === 'nether_portal') {
+                    portalTimer += delta;
+                    document.getElementById('portal-overlay').style.opacity = portalTimer / 3.0;
+                    if (portalTimer >= 3.0) {
+                        portalTimer = 0; document.getElementById('portal-overlay').style.opacity = 0;
+                        switchDimension(currentDimension === 'overworld' ? 'nether' : 'overworld');
+                    }
+                } else if (blockInside === 'end_portal') {
+                    portalTimer = 0; document.getElementById('portal-overlay').style.opacity = 0;
+                    switchDimension('end');
+                } else if (blockInside === 'return_portal') {
+                    if (!isGameClear) {
+                        isGameClear = true; controls.unlock(); document.getElementById('win-screen').style.display = 'flex';
+                        let scroll = 0; const credits = document.getElementById('credits-content');
+                        winScroller = setInterval(() => { scroll += 1; credits.style.transform = `translateY(-${scroll}px)`; if (scroll > 1500) clearInterval(winScroller); }, 50);
+                    }
+                } else {
+                    portalTimer = 0; document.getElementById('portal-overlay').style.opacity = 0;
+                }
+
+                if (actionTimer > 0) {
+                    actionTimer -= delta;
+                    if (actionType === 'swing') { const p = 1 - (actionTimer / 0.3); heldItemGroup.rotation.x = Math.sin(p * Math.PI) * -1; heldItemGroup.position.y = -0.4 + Math.sin(p * Math.PI) * 0.2; }
+                    else if (actionType === 'eat') { const p = 1 - (actionTimer / 0.5); heldItemGroup.position.x = 0.4 - Math.sin(p * Math.PI) * 0.3; heldItemGroup.position.y = -0.4 + Math.sin(p * Math.PI * 6) * 0.1; heldItemGroup.rotation.z = Math.sin(p * Math.PI) * -0.5; }
+                    if (actionTimer <= 0) { heldItemGroup.rotation.set(0, 0, 0); heldItemGroup.position.set(0.4, -0.4, -0.6); if (actionType === 'swing' && isMining) actionTimer = 0.3; }
+                } else {
+                    if (velocity.length() > 1 && canJump && !isFlying) { heldItemGroup.position.y = -0.4 + Math.sin(worldTime * 12) * 0.03; heldItemGroup.position.x = 0.4 + Math.cos(worldTime * 6) * 0.01; } else { heldItemGroup.position.set(0.4, -0.4, -0.6); }
+                    heldItemGroup.rotation.set(0, 0, 0);
+                }
+
+                raycaster.setFromCamera(center, camera);
+                const activeMeshes = [];
+                for (const chunk of chunks.values()) blockTypes.forEach(type => { if (type !== 'water' && type !== 'lava' && chunk.meshes[type].count > 0) activeMeshes.push(chunk.meshes[type]); });
+                const intersects = raycaster.intersectObjects(activeMeshes);
+
+                if (intersects.length > 0) {
+                    const intersect = intersects[0];
+                    const p = intersect.point.clone().sub(intersect.face.normal.clone().multiplyScalar(0.1));
+                    const bx = Math.floor(p.x); const by = Math.floor(p.y); const bz = Math.floor(p.z);
+                    const key = `${bx},${by},${bz}`;
+
+                    highlightBox.position.set(bx + 0.5, by + 0.5, bz + 0.5); highlightBox.visible = true;
+
+                    if (isMining) {
+                        if (targetBlockKey !== key) { targetBlockKey = key; miningTime = 0; }
+                        const blockType = getBlock(bx, by, bz);
+
+                        if (blockType && blockType !== 'bedrock' && blockType !== 'nether_portal' && blockType !== 'end_portal' && blockType !== 'return_portal' && blockType !== 'end_portal_frame_empty') {
+                            const blockDef = ITEMS[blockType];
+                            const heldItem = invState.hotbar[currentSlotIndex]; const toolDef = heldItem ? ITEMS[heldItem.type] : null;
+                            let miningPower = 1; if (toolDef && toolDef.toolType === blockDef.tool) miningPower = toolDef.power;
+                            const requiredTime = gameMode === 0 ? 0.05 : blockDef.hardness / miningPower;
+
+                            miningTime += delta; let progress = Math.min(miningTime / requiredTime, 1);
+                            highlightBox.scale.setScalar(1 + progress * 0.15); highlightMat.color.setRGB(progress, 0, 0);
+
+                            if (miningTime >= requiredTime) {
+                                let drops = false; if (blockDef.tool === 'none' || (toolDef && toolDef.toolType === blockDef.tool && toolDef.tier >= blockDef.tier)) drops = true;
+                                setBlock(bx, by, bz, null);
+                                highlightBox.visible = false; highlightBox.scale.setScalar(1); highlightMat.color.setHex(0x000000);
+                                if (drops && gameMode === 1) {
+                                    if (blockType === 'stone' && Math.random() < 0.1) { addBlockToInventory('flint'); addBlockToInventory('stone'); }
+                                    else addBlockToInventory(blockType);
+                                }
+                                renderInventoryUI();
+                                isMining = false; miningTime = 0; targetBlockKey = null;
+                            }
+                        }
+                    } else { targetBlockKey = key; miningTime = 0; highlightBox.scale.setScalar(1); highlightMat.color.setHex(0x000000); }
+                } else { highlightBox.visible = false; targetBlockKey = null; miningTime = 0; highlightBox.scale.setScalar(1); highlightMat.color.setHex(0x000000); }
+            } else {
+                highlightBox.visible = false;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+
+        animate();
+    </script>
+</body>
+
+</html>

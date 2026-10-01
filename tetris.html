@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>俄罗斯方块</title>
     <link rel="stylesheet" href="tetris.css">
 </head>
+
 <body>
     <div class="game-container">
         <div class="game-info">
@@ -24,7 +26,7 @@
                     <span id="lines">0</span>
                 </div>
             </div>
-            
+
             <div class="next-piece">
                 <div class="label">下一个:</div>
                 <canvas id="nextCanvas" width="100" height="100"></canvas>
@@ -36,18 +38,19 @@
                 <div class="control-btn" id="restartBtn">重新开始</div>
             </div>
 
-            <div class="instructions">
-                <h3>操作说明:</h3>
-                <p>← → 左右移动</p>
-                <p>↑ 旋转</p>
-                <p>↓ 加速下落</p>
-                <p>空格 直接落下</p>
-                <p>P 暂停/继续</p>
-            </div>
         </div>
 
         <div class="game-board">
             <canvas id="gameCanvas" width="300" height="600"></canvas>
+        </div>
+
+        <div class="instructions game-info">
+            <h3>操作说明:</h3>
+            <p>← → 左右移动</p>
+            <p>↑ 旋转</p>
+            <p>↓ 加速下落</p>
+            <p>空格 直接落下</p>
+            <p>P 暂停/继续</p>
         </div>
     </div>
 
@@ -62,4 +65,5 @@
 
     <script src="tetris.js"></script>
 </body>
+
 </html>

@@ -126,6 +126,39 @@ class TypingGame {
         });
 
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+        // 手机触屏唤起软键盘逻辑 改动2
+        const mobileInput = document.getElementById('mobile-input');
+        // 点击打字区域调出输入法
+        this.textDisplay.addEventListener('click', () => {
+            mobileInput.focus();
+        });
+        // 点击页面空白处也能唤起输入框
+        document.querySelector('.typing-area').addEventListener('click', () => {
+            mobileInput.focus();
+        });
+
+        // 监听输入文字
+        mobileInput.addEventListener('input', (e) => {
+            const inputChar = e.data;
+            if (!inputChar || this.isFinished) return;
+            // 输入单个字符
+            this.handleCharInput(inputChar);
+            this.renderText();
+            this.updateStats();
+            // 清空输入框，防止累积文字
+            mobileInput.value = '';
+            // 输完立刻重新聚焦，持续打字
+            mobileInput.focus();
+        });
+
+        // 监听退格删除
+        mobileInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && this.isStarted && !this.isFinished) {
+                this.handleBackspace();
+                this.renderText();
+                this.updateStats();
+            }
+        });
     }
 
     resetGame() {
@@ -302,8 +335,8 @@ class TypingGame {
         }
 
         // 计算准确率
-        const accuracy = this.totalChars > 0 
-            ? Math.round((this.correctChars / this.totalChars) * 100) 
+        const accuracy = this.totalChars > 0
+            ? Math.round((this.correctChars / this.totalChars) * 100)
             : 100;
         this.accuracyElement.textContent = accuracy + '%';
     }
@@ -315,8 +348,8 @@ class TypingGame {
         // 计算最终统计
         const timeElapsed = this.difficulties[this.currentDifficulty].duration / 60; // 分钟
         const wpm = Math.round((this.correctChars / 5) / timeElapsed) || 0;
-        const accuracy = this.totalChars > 0 
-            ? Math.round((this.correctChars / this.totalChars) * 100) 
+        const accuracy = this.totalChars > 0
+            ? Math.round((this.correctChars / this.totalChars) * 100)
             : 100;
 
         // 显示结果
