@@ -11,7 +11,6 @@ class Game2048 {
     private score = 0
     private bestScore: number
     private gameOver = false
-    private gameWon = false
     private hasWonOnce = false
 
     private readonly tileContainer: HTMLElement
@@ -89,7 +88,6 @@ class Game2048 {
         this.grid = Array.from({ length: this.size }, () => Array<number>(this.size).fill(0))
         this.score = 0
         this.gameOver = false
-        this.gameWon = false
         this.hasWonOnce = false
         this.updateScore()
         this.hideGameMessage()
@@ -159,7 +157,6 @@ class Game2048 {
             this.render(newTile, mergedPositions)
 
             if (this.checkWin()) {
-                this.gameWon = true
                 this.hasWonOnce = true
                 this.showGameMessage(true)
             } else if (this.checkGameOver()) {
