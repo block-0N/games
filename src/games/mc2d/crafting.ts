@@ -1,27 +1,29 @@
 import type { Recipe } from './recipes'
-import { RECIPES } from './recipes'
+import { RECIPES_2X2, RECIPES_3X3 } from './recipes'
 
 export type CraftGrid = (number | null)[]
 
-/**
- * 在 3x3 网格中查找匹配的配方
- * 返回配方和要消耗的格子索引列表（相对 3x3）
- */
-export function findRecipe(grid: CraftGrid): { recipe: Recipe; consume: number[] } | null {
+export function findRecipe(grid: CraftGrid, recipes: Recipe[]): { recipe: Recipe; consume: number[] } | null {
     if (grid.every(x => x === null)) return null
-
-    for (const recipe of RECIPES) {
+    for (const recipe of recipes) {
         const consume = matchShaped(grid, recipe)
         if (consume) return { recipe, consume }
     }
     return null
 }
 
+export function findRecipe2x2(grid: CraftGrid) {
+    return findRecipe(grid, RECIPES_2X2)
+}
+
+export function findRecipe3x3(grid: CraftGrid) {
+    return findRecipe(grid, RECIPES_3X3)
+}
+
 function matchShaped(grid: CraftGrid, recipe: Recipe): number[] | null {
     const patRows = recipe.pattern.length
     const patCols = Math.max(...recipe.pattern.map(r => r.length))
 
-    // 图案 → ID 2D
     const pat: (number | null)[][] = []
     for (let r = 0; r < patRows; r++) {
         const row: (number | null)[] = []
@@ -32,18 +34,18 @@ function matchShaped(grid: CraftGrid, recipe: Recipe): number[] | null {
         pat.push(row)
     }
 
-    // grid → 2D
+    // grid 是 N×N 的扁平数组
+    const size = Math.round(Math.sqrt(grid.length))
     const g: (number | null)[][] = []
-    for (let r = 0; r < 3; r++) {
+    for (let r = 0; r < size; r++) {
         const row: (number | null)[] = []
-        for (let c = 0; c < 3; c++) row.push(grid[r * 3 + c])
+        for (let c = 0; c < size; c++) row.push(grid[r * size + c])
         g.push(row)
     }
 
-    // 找 grid 最小包围盒
-    let minR = 3, maxR = -1, minC = 3, maxC = -1
-    for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
+    let minR = size, maxR = -1, minC = size, maxC = -1
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
             if (g[r][c] !== null) {
                 if (r < minR) minR = r
                 if (r > maxR) maxR = r
@@ -64,7 +66,7 @@ function matchShaped(grid: CraftGrid, recipe: Recipe): number[] | null {
             const gv = g[minR + r][minC + c]
             const pv = pat[r][c]
             if (gv !== pv) return null
-            if (gv !== null) consume.push((minR + r) * 3 + (minC + c))
+            if (gv !== null) consume.push((minR + r) * size + (minC + c))
         }
     }
     return consume

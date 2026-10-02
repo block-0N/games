@@ -12,9 +12,14 @@ import {
     MAX_HEALTH,
     MAX_HUNGER,
     STARVE_INTERVAL,
-    HEAL_INTERVAL
+    HEAL_INTERVAL,
+    FALL_SAFE_DISTANCE,
+    FURNACE_SMELT_MS,
+    TOOL_MULTIPLIER
 } from './constants'
-import { findRecipe } from './crafting'
+import { findRecipe2x2, findRecipe3x3 } from './crafting'
+import { findSmelt } from './smelting'
+import type { LightSource } from './renderer'
 
 interface Stack {
     id: number | null
@@ -29,20 +34,27 @@ interface Player {
     lastFallTime: number
 }
 
-type SlotSource = 'hotbar' | 'backpack' | 'craft' | 'craftResult'
-
-interface DragState {
-    button: number
-    startSource: SlotSource
-    startIndex: number
-    visited: Set<string>
-    startedWithHeld: boolean
-    placeDone: boolean
+interface FurnaceState {
+    input: Stack
+    fuel: Stack
+    output: Stack
+    burnTimeLeft: number
+    burnTimeMax: number
+    smeltProgress: number
 }
 
+type SlotSource =
+    | 'hotbar'
+    | 'backpack'
+    | 'craft'
+    | 'craftResult'
+    | 'furnaceInput'
+    | 'furnaceFuel'
+    | 'furnaceOutput'
+
+type UiMode = 'none' | 'backpack' | 'workbench' | 'furnace'
+
 const BACKPACK_SIZE = 27
-const CRAFT_SIZE = 9
-const HOLD_REPEAT_MS = 90
 
 class MC2D {
     private readonly canvas: HTMLCanvasElement
@@ -56,11 +68,22 @@ class MC2D {
     private hotbar: Stack[] = []
     private backpack: Stack[] = []
     private craftGrid: Stack[] = []
+    private uiMode: UiMode = 'none'
+    private craftSize = 4  // 4=2x2, 9=3x3
+    private currentFurnaceKey: string | null = null
+    private furnaces = new Map<string, FurnaceState>()
+
     private selectedSlot = 0
-    private backpackOpen = false
 
     private heldStack: Stack = { id: null, count: 0 }
-    private dragState: DragState | null = null
+    private dragState: {
+        button: number
+        startSource: SlotSource
+        startIndex: number
+        visited: Set<string>
+        startedWithHeld: boolean
+        placeDone: boolean
+    } | null = null
 
     private health = MAX_HEALTH
     private hunger = MAX_HUNGER
@@ -79,11 +102,17 @@ class MC2D {
     private hoverY = -1
 
     private mouseDownButton = -1
-    private holdTimer: number | null = null
-    private holdActive = false
-
     private mouseX = 0
     private mouseY = 0
+
+    // 挖掘进度
+    private miningX = -1
+    private miningY = -1
+    private miningProgress = 0
+    private miningTotal = 0
+
+    private lightSources: LightSource[] = []
+    private lightsDirty = true
 
     private heldEl!: HTMLElement
     private heldIconEl!: HTMLElement
@@ -110,9 +139,11 @@ class MC2D {
 
         this.hotbar = this.createSlots(HOTBAR_SIZE)
         this.backpack = this.createSlots(BACKPACK_SIZE)
-        this.craftGrid = this.createSlots(CRAFT_SIZE)
+        this.craftGrid = this.createSlots(4)
 
         this.cacheElements()
+        this.buildBackpackGridDom()
+        this.buildCraftGridDom()
         this.init()
     }
 
@@ -127,6 +158,60 @@ class MC2D {
         this.tooltipEl = document.getElementById('item-tooltip')!
         this.tooltipNameEl = document.getElementById('tooltip-name')!
         this.tooltipHintEl = document.getElementById('tooltip-hint')!
+    }
+
+    private buildBackpackGridDom(): void {
+        const bpGrid = document.getElementById('backpack-grid')!
+        bpGrid.innerHTML = ''
+        for (let i = 0; i < BACKPACK_SIZE; i++) {
+            bpGrid.appendChild(this.makeSlotEl('backpack', i))
+        }
+
+        const hbGrid = document.getElementById('backpack-hotbar')!
+        hbGrid.innerHTML = ''
+        for (let i = 0; i < HOTBAR_SIZE; i++) {
+            hbGrid.appendChild(this.makeSlotEl('hotbar', i, String(i + 1)))
+        }
+
+        const fBp = document.getElementById('furnace-backpack-grid')!
+        fBp.innerHTML = ''
+        for (let i = 0; i < BACKPACK_SIZE; i++) {
+            fBp.appendChild(this.makeSlotEl('backpack', i))
+        }
+        const fHb = document.getElementById('furnace-hotbar')!
+        fHb.innerHTML = ''
+        for (let i = 0; i < HOTBAR_SIZE; i++) {
+            fHb.appendChild(this.makeSlotEl('hotbar', i, String(i + 1)))
+        }
+    }
+
+    private makeSlotEl(source: SlotSource, index: number, key?: string): HTMLElement {
+        const el = document.createElement('div')
+        el.className = 'mc2d-bp-slot'
+        el.dataset.source = source
+        el.dataset.index = String(index)
+        if (key) {
+            const k = document.createElement('span')
+            k.className = 'mc2d-slot__key'
+            k.textContent = key
+            el.appendChild(k)
+        }
+        const icon = document.createElement('span')
+        icon.className = 'mc2d-slot__icon'
+        el.appendChild(icon)
+        const count = document.createElement('span')
+        count.className = 'mc2d-slot__count'
+        el.appendChild(count)
+        return el
+    }
+
+    private buildCraftGridDom(): void {
+        const grid = document.getElementById('craft-grid')!
+        grid.innerHTML = ''
+        grid.className = 'mc2d-craft__grid ' + (this.craftSize === 4 ? 'mc2d-craft__grid--2x2' : 'mc2d-craft__grid--3x3')
+        for (let i = 0; i < this.craftSize; i++) {
+            grid.appendChild(this.makeSlotEl('craft', i))
+        }
     }
 
     private init(): void {
@@ -168,7 +253,6 @@ class MC2D {
         this.canvas.addEventListener('mouseleave', () => {
             this.hoverX = -1
             this.hoverY = -1
-            this.stopHold()
         })
         this.canvas.addEventListener('contextmenu', e => e.preventDefault())
 
@@ -185,16 +269,13 @@ class MC2D {
             }
         })
 
-        document.addEventListener('mouseup', () => {
-            this.stopHold()
-            this.endDrag()
-        })
+        document.addEventListener('mouseup', () => this.endDrag())
 
         this.canvas.addEventListener(
             'wheel',
             e => {
                 e.preventDefault()
-                if (this.backpackOpen) return
+                if (this.uiMode !== 'none') return
                 if (e.deltaY > 0) this.selectedSlot = (this.selectedSlot + 1) % HOTBAR_SIZE
                 else if (e.deltaY < 0) this.selectedSlot = (this.selectedSlot - 1 + HOTBAR_SIZE) % HOTBAR_SIZE
                 this.updateHotbarUi()
@@ -206,7 +287,8 @@ class MC2D {
         document.getElementById('restart-btn')!.addEventListener('click', () => this.restart())
         document.getElementById('play-again-btn')!.addEventListener('click', () => this.restart())
         document.getElementById('backpack-btn')!.addEventListener('click', () => this.toggleBackpack())
-        document.getElementById('backpack-close')!.addEventListener('click', () => this.toggleBackpack())
+        document.getElementById('backpack-close')!.addEventListener('click', () => this.closeUi())
+        document.getElementById('furnace-close')!.addEventListener('click', () => this.closeUi())
 
         document.querySelectorAll<HTMLElement>('.mc2d-hotbar .mc2d-slot').forEach((el, idx) => {
             el.addEventListener('click', () => {
@@ -215,39 +297,60 @@ class MC2D {
             })
         })
 
-        const panel = document.getElementById('backpack-modal')!
-        panel.addEventListener('contextmenu', e => e.preventDefault())
+        document.querySelectorAll('.mc2d-backpack, .mc2d-furnace').forEach(panel => {
+            panel.addEventListener('contextmenu', e => e.preventDefault())
+        })
 
-        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot').forEach(el => {
-            const source = el.dataset.source as SlotSource
+        // 事件委托，动态绑定所有格子
+        document.addEventListener('mousedown', e => {
+            const el = (e.target as HTMLElement).closest('.mc2d-bp-slot') as HTMLElement | null
+            if (!el) return
+            const source = el.dataset.source as SlotSource | undefined
+            if (!source) return
             const index = parseInt(el.dataset.index ?? '0', 10)
 
-            el.addEventListener('mousedown', e => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (source === 'craftResult') {
-                    this.onCraftResultClick()
-                    return
-                }
-                this.onSlotMouseDown(source, index, e.button, e.shiftKey)
-            })
+            e.preventDefault()
+            e.stopPropagation()
 
-            el.addEventListener('mouseenter', () => {
-                if (source === 'craftResult') {
-                    this.showCraftResultTooltip()
-                    return
-                }
-                if (this.heldStack.id !== null) {
-                    this.hideTooltip()
-                    this.onSlotDragEnter(source, index)
-                } else {
-                    this.showTooltipFor(source, index)
-                    this.onSlotDragEnter(source, index)
-                }
-            })
-
-            el.addEventListener('mouseleave', () => this.hideTooltip())
+            if (source === 'craftResult') {
+                this.onCraftResultClick()
+                return
+            }
+            if (source === 'furnaceOutput') {
+                this.onFurnaceOutputClick()
+                return
+            }
+            this.onSlotMouseDown(source, index, (e as MouseEvent).button, (e as MouseEvent).shiftKey)
         })
+
+        document.addEventListener('mouseenter', e => {
+            const el = (e.target as HTMLElement).closest?.('.mc2d-bp-slot') as HTMLElement | null
+            if (!el) return
+            const source = el.dataset.source as SlotSource | undefined
+            if (!source) return
+            const index = parseInt(el.dataset.index ?? '0', 10)
+
+            if (source === 'craftResult') {
+                this.showCraftResultTooltip()
+                return
+            }
+            if (source === 'furnaceOutput') {
+                this.showFurnaceOutputTooltip()
+                return
+            }
+            if (this.heldStack.id !== null) {
+                this.hideTooltip()
+                this.onSlotDragEnter(source, index)
+            } else {
+                this.showTooltipFor(source, index)
+                this.onSlotDragEnter(source, index)
+            }
+        }, true)
+
+        document.addEventListener('mouseleave', e => {
+            const el = (e.target as HTMLElement).closest?.('.mc2d-bp-slot')
+            if (el) this.hideTooltip()
+        }, true)
     }
 
     private onKeyDown(e: KeyboardEvent): void {
@@ -260,17 +363,18 @@ class MC2D {
 
         if (e.key === 'e' || e.key === 'E') {
             if (this.paused) return
-            this.toggleBackpack()
+            if (this.uiMode === 'backpack' || this.uiMode === 'workbench') this.closeUi()
+            else this.toggleBackpack()
             e.preventDefault()
             return
         }
 
-        if (e.key === 'Escape' && this.backpackOpen) {
-            this.toggleBackpack()
+        if (e.key === 'Escape' && this.uiMode !== 'none') {
+            this.closeUi()
             return
         }
 
-        if (this.paused || this.backpackOpen) return
+        if (this.paused || this.uiMode !== 'none') return
 
         if (e.key >= '1' && e.key <= '9') {
             this.selectedSlot = parseInt(e.key, 10) - 1
@@ -314,42 +418,161 @@ class MC2D {
     }
 
     private onMouseDown(e: MouseEvent): void {
-        if (!this.running || this.paused || this.gameOver || this.backpackOpen) return
+        if (!this.running || this.paused || this.gameOver) return
+        if (this.uiMode !== 'none') return
         if (this.hoverX < 0 || this.hoverY < 0) return
+
         this.mouseDownButton = e.button
-        this.applyMouseAction(e.button)
-        this.startHold()
-    }
 
-    private startHold(): void {
-        this.clearHoldTimer()
-        this.holdActive = true
-        this.holdTimer = window.setTimeout(() => {
-            this.holdTimer = null
-            if (!this.holdActive) return
-            this.applyMouseAction(this.mouseDownButton)
-            this.startHold()
-        }, HOLD_REPEAT_MS)
-    }
-
-    private clearHoldTimer(): void {
-        if (this.holdTimer !== null) {
-            clearTimeout(this.holdTimer)
-            this.holdTimer = null
+        if (e.button === 0) {
+            // 左键开始挖
+            this.startMining(this.hoverX, this.hoverY)
+        } else if (e.button === 2) {
+            // 右键：交互/放置
+            this.onRightClick()
         }
     }
 
-    private stopHold(): void {
-        this.holdActive = false
-        this.clearHoldTimer()
-        this.mouseDownButton = -1
+    private onRightClick(): void {
+        const x = this.hoverX
+        const y = this.hoverY
+        const blockId = this.world.get(x, y)
+
+        // 优先：与方块交互
+        if (blockId === BlockId.CraftingTable) {
+            this.openWorkbench()
+            return
+        }
+        if (blockId === BlockId.Furnace) {
+            this.openFurnace(x, y)
+            return
+        }
+
+        // 其次：吃食物
+        const slot = this.hotbar[this.selectedSlot]
+        if (slot.id !== null && BLOCKS[slot.id].food) {
+            this.eatFood(slot)
+            return
+        }
+
+        // 再次：放置方块
+        this.placeBlock(x, y)
     }
 
-    private applyMouseAction(button: number): void {
-        if (this.hoverX < 0 || this.hoverY < 0) return
-        if (button === 0) this.breakBlock(this.hoverX, this.hoverY)
-        else if (button === 2) this.placeBlock(this.hoverX, this.hoverY)
+    private eatFood(slot: Stack): void {
+        if (slot.id === null) return
+        const def = BLOCKS[slot.id]
+        if (!def.food) return
+        if (this.hunger >= MAX_HUNGER) return
+
+        this.changeHunger(def.food)
+        slot.count--
+        if (slot.count <= 0) {
+            slot.id = null
+            slot.count = 0
+        }
+        this.updateHotbarUi()
     }
+
+    // ==================== 挖掘 ====================
+
+    private startMining(x: number, y: number): void {
+        const id = this.world.get(x, y)
+        if (id === BlockId.Air) return
+        if (BLOCKS[id].unbreakable) return
+
+        const def = BLOCKS[id]
+        const tool = this.getCurrentToolLevel()
+
+        if (def.breakMinLevel && tool < def.breakMinLevel) {
+            return
+        }
+
+        const baseTime = def.breakTime ?? 500
+        const mult = TOOL_MULTIPLIER[tool] ?? 1
+        this.miningTotal = baseTime / mult
+        this.miningProgress = 0
+        this.miningX = x
+        this.miningY = y
+    }
+
+    private updateMining(dt: number): void {
+        if (this.miningX < 0 || this.miningY < 0) return
+        if (this.mouseDownButton !== 0) {
+            this.resetMining()
+            return
+        }
+
+        const id = this.world.get(this.miningX, this.miningY)
+        if (id === BlockId.Air) {
+            this.resetMining()
+            return
+        }
+
+        this.miningProgress += dt
+        if (this.miningProgress >= this.miningTotal) {
+            this.breakBlock(this.miningX, this.miningY)
+            this.resetMining()
+        }
+    }
+
+    private resetMining(): void {
+        this.miningX = -1
+        this.miningY = -1
+        this.miningProgress = 0
+        this.miningTotal = 0
+    }
+
+    private getCurrentToolLevel(): number {
+        const slot = this.hotbar[this.selectedSlot]
+        if (slot.id === null) return 0
+        return BLOCKS[slot.id].toolLevel ?? 0
+    }
+
+    private breakBlock(x: number, y: number): void {
+        const id = this.world.get(x, y)
+        if (id === BlockId.Air) return
+        if (BLOCKS[id].unbreakable) return
+
+        this.world.set(x, y, BlockId.Air)
+        this.lightsDirty = true
+
+        const def = BLOCKS[id]
+        const dropId = def.drops ?? id
+        const chance = def.dropChance ?? 1
+        if (Math.random() <= chance) {
+            this.addItem(dropId, 1)
+        }
+    }
+
+    private placeBlock(x: number, y: number): void {
+        if (this.world.get(x, y) !== BlockId.Air) return
+
+        if (!this.player.sneaking) {
+            if (
+                (x === this.player.x && y === this.player.y) ||
+                (x === this.player.x && y === this.player.y - 1)
+            ) return
+        } else {
+            if (x === this.player.x && y === this.player.y) return
+        }
+
+        const slot = this.hotbar[this.selectedSlot]
+        if (slot.id === null || slot.count <= 0) return
+        if (!BLOCKS[slot.id].placeable) return
+
+        this.world.set(x, y, slot.id)
+        this.lightsDirty = true
+        slot.count--
+        if (slot.count <= 0) {
+            slot.id = null
+            slot.count = 0
+        }
+        this.updateHotbarUi()
+        if (this.uiMode !== 'none') this.renderBackpack()
+    }
+
+    // ==================== 玩家移动 ====================
 
     private tryMove(dx: number, dy: number): void {
         const nx = this.player.x + dx
@@ -374,55 +597,11 @@ class MC2D {
         return true
     }
 
-    private breakBlock(x: number, y: number): void {
-        const id = this.world.get(x, y)
-        if (id === BlockId.Air) return
-        if (BLOCKS[id].unbreakable) return
-
-        this.world.set(x, y, BlockId.Air)
-
-        // 掉落物映射
-        let drop = id
-        if (id === BlockId.Stone) drop = BlockId.Cobble
-        else if (id === BlockId.CoalOre) drop = BlockId.Coal
-        else if (id === BlockId.IronOre) drop = BlockId.IronIngot
-        else if (id === BlockId.GoldOre) drop = BlockId.GoldIngot
-        else if (id === BlockId.DiamondOre) drop = BlockId.Diamond
-
-        this.addItem(drop, 1)
-    }
-
-    private placeBlock(x: number, y: number): void {
-        if (this.world.get(x, y) !== BlockId.Air) return
-
-        if (!this.player.sneaking) {
-            if (
-                (x === this.player.x && y === this.player.y) ||
-                (x === this.player.x && y === this.player.y - 1)
-            ) return
-        } else {
-            if (x === this.player.x && y === this.player.y) return
-        }
-
-        const slot = this.hotbar[this.selectedSlot]
-        if (slot.id === null || slot.count <= 0) return
-        if (!BLOCKS[slot.id].placeable) return
-
-        this.world.set(x, y, slot.id)
-        slot.count--
-        if (slot.count <= 0) {
-            slot.id = null
-            slot.count = 0
-        }
-        this.updateHotbarUi()
-        if (this.backpackOpen) this.renderBackpack()
-    }
-
     private addItem(id: number, count: number): void {
         count = this.stackInto(this.hotbar, id, count)
         if (count > 0) count = this.stackInto(this.backpack, id, count)
         this.updateHotbarUi()
-        if (this.backpackOpen) this.renderBackpack()
+        if (this.uiMode !== 'none') this.renderBackpack()
     }
 
     private stackInto(list: Stack[], id: number, count: number): number {
@@ -449,6 +628,13 @@ class MC2D {
         if (source === 'hotbar') return this.hotbar[index]
         if (source === 'backpack') return this.backpack[index]
         if (source === 'craft') return this.craftGrid[index]
+        if (source === 'furnaceInput' || source === 'furnaceFuel' || source === 'furnaceOutput') {
+            const f = this.getCurrentFurnace()
+            if (!f) return null
+            if (source === 'furnaceInput') return f.input
+            if (source === 'furnaceFuel') return f.fuel
+            return f.output
+        }
         return null
     }
 
@@ -462,28 +648,49 @@ class MC2D {
     }
 
     private renderBackpack(): void {
-        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="backpack"]').forEach((el, idx) => {
+        if (this.uiMode === 'none') {
+            this.renderHeld()
+            return
+        }
+
+        // 所有 backpack / hotbar 格
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="backpack"]').forEach(el => {
+            const idx = parseInt(el.dataset.index ?? '0', 10)
             this.updateSlotEl(el, this.backpack[idx])
         })
-        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="hotbar"]').forEach((el, idx) => {
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="hotbar"]').forEach(el => {
+            const idx = parseInt(el.dataset.index ?? '0', 10)
             this.updateSlotEl(el, this.hotbar[idx])
         })
-        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="craft"]').forEach((el, idx) => {
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="craft"]').forEach(el => {
+            const idx = parseInt(el.dataset.index ?? '0', 10)
             this.updateSlotEl(el, this.craftGrid[idx])
         })
 
-        // 结果格
-        const resultEl = document.getElementById('craft-result')!
-        const result = this.computeCraftResult()
-        if (result) {
-            this.updateSlotEl(resultEl, result)
-        } else {
-            this.updateSlotEl(resultEl, { id: null, count: 0 })
+        // 合成结果格
+        const resultEl = document.getElementById('craft-result')
+        if (resultEl) {
+            const result = this.computeCraftResult()
+            this.updateSlotEl(resultEl, result ?? { id: null, count: 0 })
+        }
+
+        // 熔炉格
+        const f = this.getCurrentFurnace()
+        if (f) {
+            const inEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceInput"]')
+            const fuelEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceFuel"]')
+            const outEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceOutput"]')
+            if (inEl) this.updateSlotEl(inEl, f.input)
+            if (fuelEl) this.updateSlotEl(fuelEl, f.fuel)
+            if (outEl) this.updateSlotEl(outEl, f.output)
         }
 
         this.drawPlayerModel()
-        document.getElementById('bp-health')!.textContent = String(this.health)
-        document.getElementById('bp-hunger')!.textContent = String(this.hunger)
+        const hEl = document.getElementById('bp-health')
+        const huEl = document.getElementById('bp-hunger')
+        if (hEl) hEl.textContent = String(this.health)
+        if (huEl) huEl.textContent = String(this.hunger)
+
         this.renderHeld()
     }
 
@@ -521,16 +728,16 @@ class MC2D {
 
     private computeCraftResult(): Stack | null {
         const grid = this.craftGrid.map(s => s.id)
-        const found = findRecipe(grid)
+        const found = this.craftSize === 4 ? findRecipe2x2(grid) : findRecipe3x3(grid)
         if (!found) return null
         return { id: found.recipe.result.id, count: found.recipe.result.count }
     }
 
     private onCraftResultClick(): void {
-        const found = findRecipe(this.craftGrid.map(s => s.id))
+        const grid = this.craftGrid.map(s => s.id)
+        const found = this.craftSize === 4 ? findRecipe2x2(grid) : findRecipe3x3(grid)
         if (!found) return
 
-        // 消耗
         for (const idx of found.consume) {
             const s = this.craftGrid[idx]
             s.count--
@@ -540,7 +747,6 @@ class MC2D {
             }
         }
 
-        // 产出
         let rest = this.stackInto(this.backpack, found.recipe.result.id, found.recipe.result.count)
         if (rest > 0) rest = this.stackInto(this.hotbar, found.recipe.result.id, rest)
 
@@ -561,26 +767,204 @@ class MC2D {
         this.tooltipEl.style.top = `${this.mouseY + 14}px`
     }
 
-    // ==================== 背包开关 ====================
+    // ==================== 熔炉 ====================
+
+    private getCurrentFurnace(): FurnaceState | null {
+        if (!this.currentFurnaceKey) return null
+        let f = this.furnaces.get(this.currentFurnaceKey)
+        if (!f) {
+            f = {
+                input: { id: null, count: 0 },
+                fuel: { id: null, count: 0 },
+                output: { id: null, count: 0 },
+                burnTimeLeft: 0,
+                burnTimeMax: 0,
+                smeltProgress: 0
+            }
+            this.furnaces.set(this.currentFurnaceKey, f)
+        }
+        return f
+    }
+
+    private openFurnace(x: number, y: number): void {
+        this.currentFurnaceKey = `${x},${y}`
+        this.uiMode = 'furnace'
+        this.openUiPanel('furnace-modal')
+        this.renderBackpack()
+    }
+
+    private tickFurnaces(dt: number): void {
+        for (const f of this.furnaces.values()) {
+            this.tickFurnace(f, dt)
+        }
+        // 更新熔炉 UI
+        if (this.uiMode === 'furnace') {
+            const f = this.getCurrentFurnace()
+            if (f) {
+                const bar = document.getElementById('furnace-progress')
+                const fire = document.querySelector('.mc2d-furnace__fire')
+                if (bar) bar.style.width = `${(f.smeltProgress / FURNACE_SMELT_MS) * 100}%`
+                if (fire) fire.classList.toggle('is-active', f.burnTimeLeft > 0)
+                const inEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceInput"]')
+                const fuelEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceFuel"]')
+                const outEl = document.querySelector<HTMLElement>('.mc2d-bp-slot[data-source="furnaceOutput"]')
+                if (inEl) this.updateSlotEl(inEl, f.input)
+                if (fuelEl) this.updateSlotEl(fuelEl, f.fuel)
+                if (outEl) this.updateSlotEl(outEl, f.output)
+            }
+        }
+    }
+
+    private tickFurnace(f: FurnaceState, dt: number): void {
+        const smelt = findSmelt(f.input.id)
+
+        const canOutput =
+            smelt !== null &&
+            f.input.count > 0 &&
+            (f.output.id === null || (f.output.id === smelt.output && f.output.count < MAX_STACK))
+
+        // 消耗燃料
+        if (f.burnTimeLeft <= 0 && canOutput && f.fuel.id !== null && f.fuel.count > 0) {
+            const fuelDef = BLOCKS[f.fuel.id]
+            if (fuelDef.fuel) {
+                f.burnTimeLeft = fuelDef.fuel * 1000
+                f.burnTimeMax = f.burnTimeLeft
+                f.fuel.count--
+                if (f.fuel.count <= 0) {
+                    f.fuel.id = null
+                    f.fuel.count = 0
+                }
+            }
+        }
+
+        if (f.burnTimeLeft > 0) {
+            f.burnTimeLeft -= dt
+            if (f.burnTimeLeft < 0) f.burnTimeLeft = 0
+        }
+
+        if (canOutput && f.burnTimeLeft > 0) {
+            f.smeltProgress += dt
+            if (f.smeltProgress >= FURNACE_SMELT_MS) {
+                f.smeltProgress = 0
+                if (f.output.id === null) {
+                    f.output.id = smelt!.output
+                    f.output.count = smelt!.count
+                } else {
+                    f.output.count += smelt!.count
+                }
+                f.input.count--
+                if (f.input.count <= 0) {
+                    f.input.id = null
+                    f.input.count = 0
+                }
+            }
+        } else {
+            f.smeltProgress = 0
+        }
+    }
+
+    private onFurnaceOutputClick(): void {
+        const f = this.getCurrentFurnace()
+        if (!f || f.output.id === null) return
+        let rest = this.stackInto(this.backpack, f.output.id, f.output.count)
+        if (rest > 0) rest = this.stackInto(this.hotbar, f.output.id, rest)
+        f.output.id = null
+        f.output.count = 0
+        this.syncBothUis()
+    }
+
+    private showFurnaceOutputTooltip(): void {
+        const f = this.getCurrentFurnace()
+        if (!f || f.output.id === null) {
+            this.hideTooltip()
+            return
+        }
+        this.tooltipNameEl.textContent = BLOCKS[f.output.id].name
+        this.tooltipHintEl.textContent = `点击取出 · 数量 ${f.output.count}`
+        this.tooltipEl.classList.add('is-visible')
+        this.tooltipEl.style.left = `${this.mouseX + 14}px`
+        this.tooltipEl.style.top = `${this.mouseY + 14}px`
+    }
+
+    // ==================== UI 控制 ====================
+
+    private openUiPanel(id: string): void {
+        document.getElementById(id)!.classList.add('is-open')
+    }
 
     private toggleBackpack(): void {
         if (this.gameOver) return
-        this.backpackOpen = !this.backpackOpen
-        this.stopHold()
-        this.dragState = null
-        this.hideTooltip()
+        if (this.uiMode === 'backpack') {
+            this.closeUi()
+            return
+        }
+        this.setCraftSize(4)
+        this.uiMode = 'backpack'
+        const title = document.getElementById('backpack-title')
+        if (title) title.textContent = '背包'
+        const label = document.getElementById('craft-label')
+        if (label) label.textContent = '合成（2×2）'
+        this.openUiPanel('backpack-modal')
+        this.renderBackpack()
+    }
 
-        if (!this.backpackOpen) {
-            // 关背包时把手上 + 合成格物品归还
-            if (this.heldStack.id !== null) this.returnHeldToInventory()
-            this.returnCraftGridToInventory()
+    private openWorkbench(): void {
+        if (this.gameOver) return
+        this.setCraftSize(9)
+        this.uiMode = 'workbench'
+        const title = document.getElementById('backpack-title')
+        if (title) title.textContent = '工作台'
+        const label = document.getElementById('craft-label')
+        if (label) label.textContent = '合成（3×3）'
+        this.openUiPanel('backpack-modal')
+        this.renderBackpack()
+    }
+
+    private setCraftSize(size: number): void {
+        if (this.craftSize === size) return
+        // 把现有材料返回背包
+        for (const slot of this.craftGrid) {
+            if (slot.id !== null && slot.count > 0) {
+                let rest = this.stackInto(this.backpack, slot.id, slot.count)
+                if (rest > 0) rest = this.stackInto(this.hotbar, slot.id, rest)
+                slot.id = null
+                slot.count = 0
+            }
+        }
+        this.craftSize = size
+        this.craftGrid = this.createSlots(size)
+        this.buildCraftGridDom()
+    }
+
+    private closeUi(): void {
+        const wasMode = this.uiMode
+        this.uiMode = 'none'
+        this.currentFurnaceKey = null
+
+        document.getElementById('backpack-modal')?.classList.remove('is-open')
+        document.getElementById('furnace-modal')?.classList.remove('is-open')
+
+        if (this.heldStack.id !== null) this.returnHeldToInventory()
+
+        // 关闭合成格时把物品返回背包
+        for (const slot of this.craftGrid) {
+            if (slot.id !== null && slot.count > 0) {
+                let rest = this.stackInto(this.backpack, slot.id, slot.count)
+                if (rest > 0) rest = this.stackInto(this.hotbar, slot.id, rest)
+                slot.id = null
+                slot.count = 0
+            }
         }
 
-        const modal = document.getElementById('backpack-modal')!
-        modal.classList.toggle('is-open', this.backpackOpen)
+        // 如果是工作台，合成格从 9 变回 4
+        if (wasMode === 'workbench') {
+            this.craftSize = 4
+            this.craftGrid = this.createSlots(4)
+            this.buildCraftGridDom()
+        }
 
-        if (this.backpackOpen) this.renderBackpack()
-        else this.renderHeld()
+        this.hideTooltip()
+        this.renderHeld()
     }
 
     private returnHeldToInventory(): void {
@@ -592,17 +976,7 @@ class MC2D {
         this.heldStack = { id: null, count: 0 }
     }
 
-    private returnCraftGridToInventory(): void {
-        for (const slot of this.craftGrid) {
-            if (slot.id === null || slot.count <= 0) continue
-            let rest = this.stackInto(this.backpack, slot.id, slot.count)
-            if (rest > 0) rest = this.stackInto(this.hotbar, slot.id, rest)
-            slot.id = null
-            slot.count = 0
-        }
-    }
-
-    // ==================== Minecraft 交互 ====================
+    // ==================== 交互（物品栏） ====================
 
     private onSlotMouseDown(source: SlotSource, index: number, button: number, shift: boolean): void {
         if (shift) {
@@ -745,8 +1119,10 @@ class MC2D {
         const slot = this.getSlot(source, index)
         if (!slot || slot.id === null || slot.count <= 0) return
 
-        const target =
-            source === 'hotbar' ? this.backpack : this.hotbar
+        let target: Stack[]
+        if (source === 'hotbar') target = this.backpack
+        else if (source === 'backpack') target = this.hotbar
+        else target = this.backpack
 
         const remaining = this.stackInto(target, slot.id, slot.count)
         if (remaining === 0) {
@@ -767,10 +1143,10 @@ class MC2D {
         const def = BLOCKS[slot.id]
         this.tooltipNameEl.textContent = def.name
         const tips: string[] = [`数量 ${slot.count}`]
-        if (def.unbreakable) tips.push('无法破坏')
         if (def.food) tips.push(`食用回复 ${def.food} 饥饿`)
-        if (def.toolLevel) tips.push(`工具等级 ${def.toolLevel}`)
-        if (!def.placeable && !def.food) tips.push('不可放置')
+        if (def.toolLevel) tips.push(`镐等级 ${def.toolLevel}`)
+        if (def.fuel) tips.push(`可作燃料`)
+        if (!def.placeable && !def.food && !def.toolLevel && !def.fuel) tips.push('材料')
         this.tooltipHintEl.textContent = tips.join(' · ')
         this.tooltipEl.classList.add('is-visible')
         this.tooltipEl.style.left = `${this.mouseX + 14}px`
@@ -851,16 +1227,18 @@ class MC2D {
     private changeHunger(delta: number): void {
         this.hunger = Math.max(0, Math.min(MAX_HUNGER, this.hunger + delta))
         this.updateHud()
-        if (this.backpackOpen) {
-            document.getElementById('bp-hunger')!.textContent = String(this.hunger)
+        if (this.uiMode !== 'none') {
+            const el = document.getElementById('bp-hunger')
+            if (el) el.textContent = String(this.hunger)
         }
     }
 
     private changeHealth(delta: number): void {
         this.health = Math.max(0, Math.min(MAX_HEALTH, this.health + delta))
         this.updateHud()
-        if (this.backpackOpen) {
-            document.getElementById('bp-health')!.textContent = String(this.health)
+        if (this.uiMode !== 'none') {
+            const el = document.getElementById('bp-health')
+            if (el) el.textContent = String(this.health)
         }
         if (this.health <= 0) {
             this.gameOver = true
@@ -897,6 +1275,8 @@ class MC2D {
         document.getElementById('game-over-modal')!.classList.remove('is-open')
     }
 
+    // ==================== 游戏控制 ====================
+
     private togglePause(): void {
         if (this.gameOver) return
         this.paused = !this.paused
@@ -915,36 +1295,64 @@ class MC2D {
         requestAnimationFrame(t => this.loop(t))
     }
 
+    // ==================== 主循环 ====================
+
     private loop(time: number): void {
         if (!this.running) return
         const dt = Math.min(time - this.lastTime, 100)
         this.lastTime = time
-        if (!this.paused && !this.backpackOpen) this.update(dt, time)
+
+        if (!this.paused && this.uiMode === 'none') {
+            this.update(dt, time)
+        }
+        // 熔炉在任何 UI 下都继续运行（real time）
+        this.tickFurnaces(dt)
+
         this.render()
         requestAnimationFrame(t => this.loop(t))
     }
 
-    private update(_dt: number, time: number): void {
+    private update(dt: number, time: number): void {
         this.updateGravity(time)
         this.updateStarveHeal(time)
         this.updateCamera()
+        this.updateMining(dt)
     }
 
     private updateGravity(time: number): void {
         if (time < this.jumpLockedUntil) return
+
         const p = this.player
         const below = p.y + 1
         const canFall = !this.world.isSolid(p.x, below)
+
         if (canFall) {
+            if (p.onGround) {
+                // 刚离开地面，记录起点
+                p.lastFallTime = time
+                // 用 lastFallTime 当作落地高度标记的起点，暂存在 sneaking 无关变量
+                // 这里用跳转标志简化：记录 fellFrom
+                this.fellFrom = p.y
+            }
             p.onGround = false
             if (time - p.lastFallTime > GRAVITY_INTERVAL) {
                 p.y = below
                 p.lastFallTime = time
             }
         } else {
+            if (!p.onGround && this.fellFrom >= 0) {
+                const fallDist = p.y - this.fellFrom
+                if (fallDist > FALL_SAFE_DISTANCE) {
+                    const dmg = Math.floor(fallDist - FALL_SAFE_DISTANCE)
+                    if (dmg > 0) this.changeHealth(-dmg)
+                }
+                this.fellFrom = -1
+            }
             p.onGround = true
         }
     }
+
+    private fellFrom = -1
 
     private updateStarveHeal(time: number): void {
         if (this.hunger <= 0) {
@@ -969,9 +1377,30 @@ class MC2D {
         this.camera.y += (targetY - this.camera.y) * 0.15
     }
 
+    private refreshLights(): void {
+        this.lightSources = []
+        // 简化：扫描玩家周围 60 格范围
+        const px = Math.floor(this.player.x)
+        const py = Math.floor(this.player.y)
+        const range = 40
+        for (let y = py - range; y <= py + range; y++) {
+            for (let x = px - range; x <= px + range; x++) {
+                const id = this.world.get(x, y)
+                if (id === BlockId.Torch) {
+                    this.lightSources.push({ x, y, radius: BLOCKS[id].lightRadius ?? 0 })
+                }
+            }
+        }
+        this.lightsDirty = false
+    }
+
     private render(): void {
         this.renderer.clear()
         this.renderer.drawWorld(this.world, this.camera, this.cellSize)
+
+        if (this.lightsDirty) this.refreshLights()
+        this.renderer.drawLights(this.lightSources, this.camera, this.cellSize)
+
         if (
             this.hoverX >= 0 &&
             this.hoverY >= 0 &&
@@ -979,6 +1408,12 @@ class MC2D {
         ) {
             this.renderer.drawTargetHighlight(this.hoverX, this.hoverY, this.camera, this.cellSize)
         }
+
+        if (this.miningX >= 0 && this.miningTotal > 0) {
+            const p = Math.min(1, this.miningProgress / this.miningTotal)
+            this.renderer.drawBreakProgress(this.miningX, this.miningY, this.camera, this.cellSize, p)
+        }
+
         this.renderer.drawPlayer(this.player, this.camera, this.cellSize)
     }
 }

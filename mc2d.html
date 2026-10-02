@@ -52,10 +52,11 @@
                 </footer>
         </div>
 
+        <!-- 背包 / 工作台（共享同一模态，切换网格） -->
         <div class="mc2d-backpack" id="backpack-modal">
                 <div class="mc2d-backpack__panel">
                         <header class="mc2d-backpack__header">
-                                <h2 class="mc2d-backpack__title">背包</h2>
+                                <h2 class="mc2d-backpack__title" id="backpack-title">背包</h2>
                                 <button class="ui-btn" id="backpack-close">关闭</button>
                         </header>
 
@@ -75,189 +76,79 @@
                                 </aside>
 
                                 <div class="mc2d-backpack__items">
-                                        <!-- 合成区 -->
-                                        <div class="mc2d-backpack__section-label">合成</div>
-                                        <div class="mc2d-craft">
+                                        <div class="mc2d-backpack__section-label" id="craft-label">合成（2×2）</div>
+                                        <div class="mc2d-craft" id="craft-area">
                                                 <div class="mc2d-craft__grid" id="craft-grid">
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="0">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="1">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="2">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="3">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="4">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="5">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="6">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="7">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
-                                                        <div class="mc2d-bp-slot" data-source="craft" data-index="8">
-                                                                <span class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span>
-                                                        </div>
+                                                        <!-- 由 JS 动态填充 -->
                                                 </div>
                                                 <div class="mc2d-craft__arrow">→</div>
                                                 <div class="mc2d-craft__result">
                                                         <div class="mc2d-bp-slot mc2d-bp-slot--result"
                                                                 data-source="craftResult" data-index="0"
-                                                                id="craft-result"><span
-                                                                        class="mc2d-slot__icon"></span><span
-                                                                        class="mc2d-slot__count"></span></div>
+                                                                id="craft-result">
+                                                                <span class="mc2d-slot__icon"></span>
+                                                                <span class="mc2d-slot__count"></span>
+                                                        </div>
                                                 </div>
                                         </div>
 
                                         <div class="mc2d-backpack__divider"></div>
-
                                         <div class="mc2d-backpack__section-label">背包</div>
-                                        <div class="mc2d-backpack__grid" id="backpack-grid">
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="0"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="1"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="2"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="3"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="4"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="5"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="6"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="7"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="8"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="9"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="10"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="11"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="12"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="13"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="14"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="15"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="16"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="17"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="18"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="19"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="20"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="21"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="22"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="23"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="24"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="25"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="backpack" data-index="26"><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                        </div>
+                                        <div class="mc2d-backpack__grid" id="backpack-grid"></div>
 
                                         <div class="mc2d-backpack__divider"></div>
                                         <div class="mc2d-backpack__section-label">快捷栏</div>
                                         <div class="mc2d-backpack__grid mc2d-backpack__grid--hotbar"
-                                                id="backpack-hotbar">
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="0"><span
-                                                                class="mc2d-slot__key">1</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="1"><span
-                                                                class="mc2d-slot__key">2</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="2"><span
-                                                                class="mc2d-slot__key">3</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="3"><span
-                                                                class="mc2d-slot__key">4</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="4"><span
-                                                                class="mc2d-slot__key">5</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="5"><span
-                                                                class="mc2d-slot__key">6</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="6"><span
-                                                                class="mc2d-slot__key">7</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="7"><span
-                                                                class="mc2d-slot__key">8</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                                <div class="mc2d-bp-slot" data-source="hotbar" data-index="8"><span
-                                                                class="mc2d-slot__key">9</span><span
-                                                                class="mc2d-slot__icon"></span><span
-                                                                class="mc2d-slot__count"></span></div>
-                                        </div>
+                                                id="backpack-hotbar"></div>
                                 </div>
                         </div>
 
-                        <p class="mc2d-backpack__hint">左键拿起 · 右键拿一半 · Shift+左键快移 · 放到 3×3 合成格合成</p>
+                        <p class="mc2d-backpack__hint">左键拿起 · 右键拿一半 · Shift+左键快移 · 放到合成格合成</p>
+                </div>
+        </div>
+
+        <!-- 熔炉 -->
+        <div class="mc2d-backpack mc2d-furnace" id="furnace-modal">
+                <div class="mc2d-backpack__panel">
+                        <header class="mc2d-backpack__header">
+                                <h2 class="mc2d-backpack__title">熔炉</h2>
+                                <button class="ui-btn" id="furnace-close">关闭</button>
+                        </header>
+
+                        <div class="mc2d-furnace__body">
+                                <div class="mc2d-furnace__col">
+                                        <div class="mc2d-backpack__section-label">原料</div>
+                                        <div class="mc2d-bp-slot" data-source="furnaceInput" data-index="0"><span
+                                                        class="mc2d-slot__icon"></span><span
+                                                        class="mc2d-slot__count"></span></div>
+                                        <div class="mc2d-backpack__section-label">燃料</div>
+                                        <div class="mc2d-bp-slot" data-source="furnaceFuel" data-index="0"><span
+                                                        class="mc2d-slot__icon"></span><span
+                                                        class="mc2d-slot__count"></span></div>
+                                </div>
+
+                                <div class="mc2d-furnace__mid">
+                                        <div class="mc2d-furnace__progress">
+                                                <div class="mc2d-furnace__progress-fill" id="furnace-progress"></div>
+                                        </div>
+                                        <div class="mc2d-furnace__fire">🔥</div>
+                                </div>
+
+                                <div class="mc2d-furnace__col">
+                                        <div class="mc2d-backpack__section-label">产物</div>
+                                        <div class="mc2d-bp-slot mc2d-bp-slot--result" data-source="furnaceOutput"
+                                                data-index="0"><span class="mc2d-slot__icon"></span><span
+                                                        class="mc2d-slot__count"></span></div>
+                                </div>
+                        </div>
+
+                        <div class="mc2d-backpack__divider"></div>
+                        <div class="mc2d-backpack__section-label">背包</div>
+                        <div class="mc2d-backpack__grid" id="furnace-backpack-grid"></div>
+                        <div class="mc2d-backpack__section-label">快捷栏</div>
+                        <div class="mc2d-backpack__grid mc2d-backpack__grid--hotbar" id="furnace-hotbar"></div>
+
+                        <p class="mc2d-backpack__hint">放入原铁/原金 + 燃料（煤炭/木板/木棍），自动烧炼</p>
                 </div>
         </div>
 

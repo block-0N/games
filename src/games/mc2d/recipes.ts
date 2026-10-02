@@ -6,9 +6,8 @@ export interface Recipe {
     result: { id: number; count: number }
 }
 
-// 字符约定：
-// L 原木  P 木板  S 木棍  C 煤炭  R 圆石  I 铁锭
-export const RECIPES: Recipe[] = [
+// 2x2 配方（背包内合成）
+export const RECIPES_2X2: Recipe[] = [
     {
         pattern: ['L'],
         keys: { L: BlockId.Log },
@@ -25,18 +24,28 @@ export const RECIPES: Recipe[] = [
         result: { id: BlockId.CraftingTable, count: 1 }
     },
     {
+        pattern: ['CC', 'CC'],
+        keys: { C: BlockId.Cobble },
+        result: { id: BlockId.Furnace, count: 1 }
+    },
+    {
         pattern: ['C', 'S'],
         keys: { C: BlockId.Coal, S: BlockId.Stick },
         result: { id: BlockId.Torch, count: 4 }
-    },
+    }
+]
+
+// 3x3 配方（工作台）
+export const RECIPES_3X3: Recipe[] = [
+    ...RECIPES_2X2,
     {
         pattern: ['PPP', ' S ', ' S '],
         keys: { P: BlockId.Plank, S: BlockId.Stick },
         result: { id: BlockId.WoodPickaxe, count: 1 }
     },
     {
-        pattern: ['RRR', ' S ', ' S '],
-        keys: { R: BlockId.Cobble, S: BlockId.Stick },
+        pattern: ['CCC', ' S ', ' S '],
+        keys: { C: BlockId.Cobble, S: BlockId.Stick },
         result: { id: BlockId.StonePickaxe, count: 1 }
     },
     {
