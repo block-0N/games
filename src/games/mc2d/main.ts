@@ -14,6 +14,7 @@ import {
     STARVE_INTERVAL,
     HEAL_INTERVAL
 } from './constants'
+import { findRecipe } from './crafting'
 
 interface Stack {
     id: number | null
@@ -28,9 +29,19 @@ interface Player {
     lastFallTime: number
 }
 
-type SlotSource = 'hotbar' | 'backpack'
+type SlotSource = 'hotbar' | 'backpack' | 'craft' | 'craftResult'
+
+interface DragState {
+    button: number
+    startSource: SlotSource
+    startIndex: number
+    visited: Set<string>
+    startedWithHeld: boolean
+    placeDone: boolean
+}
 
 const BACKPACK_SIZE = 27
+const CRAFT_SIZE = 9
 const HOLD_REPEAT_MS = 90
 
 class MC2D {
@@ -44,14 +55,12 @@ class MC2D {
 
     private hotbar: Stack[] = []
     private backpack: Stack[] = []
+    private craftGrid: Stack[] = []
     private selectedSlot = 0
     private backpackOpen = false
 
-    // 手持物品（Minecraft 风格光标跟随堆叠）
     private heldStack: Stack = { id: null, count: 0 }
-
-    // 拖拽分发：按下时记录，鼠标经过格子时分发
-    private dragging: { button: number; distributable: boolean; visited: Set<string> } | null = null
+    private dragState: DragState | null = null
 
     private health = MAX_HEALTH
     private hunger = MAX_HUNGER
@@ -72,6 +81,9 @@ class MC2D {
     private mouseDownButton = -1
     private holdTimer: number | null = null
     private holdActive = false
+
+    private mouseX = 0
+    private mouseY = 0
 
     private heldEl!: HTMLElement
     private heldIconEl!: HTMLElement
@@ -96,11 +108,16 @@ class MC2D {
             lastFallTime: 0
         }
 
-        this.hotbar = Array.from({ length: HOTBAR_SIZE }, () => ({ id: null, count: 0 }))
-        this.backpack = Array.from({ length: BACKPACK_SIZE }, () => ({ id: null, count: 0 }))
+        this.hotbar = this.createSlots(HOTBAR_SIZE)
+        this.backpack = this.createSlots(BACKPACK_SIZE)
+        this.craftGrid = this.createSlots(CRAFT_SIZE)
 
         this.cacheElements()
         this.init()
+    }
+
+    private createSlots(n: number): Stack[] {
+        return Array.from({ length: n }, () => ({ id: null, count: 0 }))
     }
 
     private cacheElements(): void {
@@ -121,8 +138,6 @@ class MC2D {
         this.start()
     }
 
-    // ==================== 尺寸 ====================
-
     private resize(): void {
         const wrapper = this.canvas.parentElement!
         const rect = wrapper.getBoundingClientRect()
@@ -142,8 +157,6 @@ class MC2D {
         this.camera.y = this.player.y - rows / 2
     }
 
-    // ==================== 事件 ====================
-
     private bindEvents(): void {
         window.addEventListener('resize', () => this.resize())
 
@@ -159,7 +172,23 @@ class MC2D {
         })
         this.canvas.addEventListener('contextmenu', e => e.preventDefault())
 
-        document.addEventListener('mouseup', () => this.stopHold())
+        document.addEventListener('mousemove', e => {
+            this.mouseX = e.clientX
+            this.mouseY = e.clientY
+            if (this.heldStack.id !== null) {
+                this.heldEl.style.left = `${e.clientX}px`
+                this.heldEl.style.top = `${e.clientY}px`
+            }
+            if (this.tooltipEl.classList.contains('is-visible')) {
+                this.tooltipEl.style.left = `${e.clientX + 14}px`
+                this.tooltipEl.style.top = `${e.clientY + 14}px`
+            }
+        })
+
+        document.addEventListener('mouseup', () => {
+            this.stopHold()
+            this.endDrag()
+        })
 
         this.canvas.addEventListener(
             'wheel',
@@ -179,7 +208,6 @@ class MC2D {
         document.getElementById('backpack-btn')!.addEventListener('click', () => this.toggleBackpack())
         document.getElementById('backpack-close')!.addEventListener('click', () => this.toggleBackpack())
 
-        // 底部快捷栏
         document.querySelectorAll<HTMLElement>('.mc2d-hotbar .mc2d-slot').forEach((el, idx) => {
             el.addEventListener('click', () => {
                 this.selectedSlot = idx
@@ -187,51 +215,39 @@ class MC2D {
             })
         })
 
-        // 背包面板格子：鼠标按下 / 悬停 / 移动
         const panel = document.getElementById('backpack-modal')!
+        panel.addEventListener('contextmenu', e => e.preventDefault())
+
         document.querySelectorAll<HTMLElement>('.mc2d-bp-slot').forEach(el => {
+            const source = el.dataset.source as SlotSource
+            const index = parseInt(el.dataset.index ?? '0', 10)
+
             el.addEventListener('mousedown', e => {
                 e.preventDefault()
                 e.stopPropagation()
-                const source = el.dataset.source as SlotSource
-                const index = parseInt(el.dataset.index ?? '0', 10)
+                if (source === 'craftResult') {
+                    this.onCraftResultClick()
+                    return
+                }
                 this.onSlotMouseDown(source, index, e.button, e.shiftKey)
             })
 
             el.addEventListener('mouseenter', () => {
-                const source = el.dataset.source as SlotSource
-                const index = parseInt(el.dataset.index ?? '0', 10)
-                this.showTooltipFor(source, index)
-                this.onSlotDragEnter(source, index)
+                if (source === 'craftResult') {
+                    this.showCraftResultTooltip()
+                    return
+                }
+                if (this.heldStack.id !== null) {
+                    this.hideTooltip()
+                    this.onSlotDragEnter(source, index)
+                } else {
+                    this.showTooltipFor(source, index)
+                    this.onSlotDragEnter(source, index)
+                }
             })
 
-            el.addEventListener('mouseleave', () => {
-                this.hideTooltip()
-            })
+            el.addEventListener('mouseleave', () => this.hideTooltip())
         })
-
-        // 全局鼠标移动：更新手持和 tooltip 位置 + 拖拽分发
-        document.addEventListener('mousemove', e => {
-            if (this.heldStack.id !== null) {
-                this.heldEl.style.left = `${e.clientX}px`
-                this.heldEl.style.top = `${e.clientY}px`
-            }
-            if (this.tooltipEl.classList.contains('is-visible')) {
-                this.tooltipEl.style.left = `${e.clientX + 14}px`
-                this.tooltipEl.style.top = `${e.clientY + 14}px`
-            }
-        })
-
-        // 拖拽结束
-        document.addEventListener('mouseup', () => {
-            if (this.dragging) {
-                this.dragging = null
-            }
-            this.hideTooltip()
-        })
-
-        // 阻止面板右键
-        panel.addEventListener('contextmenu', e => e.preventDefault())
     }
 
     private onKeyDown(e: KeyboardEvent): void {
@@ -271,40 +287,19 @@ class MC2D {
         const beforeY = this.player.y
 
         switch (e.key) {
-            case 'a':
-            case 'A':
-            case 'ArrowLeft':
-                this.tryMove(-1, 0)
-                break
-            case 'd':
-            case 'D':
-            case 'ArrowRight':
-                this.tryMove(1, 0)
-                break
-            case 'w':
-            case 'W':
-            case 'ArrowUp':
-                this.tryJump()
-                break
-            case 's':
-            case 'S':
-            case 'ArrowDown':
-                this.tryMove(0, 1)
-                break
+            case 'a': case 'A': case 'ArrowLeft': this.tryMove(-1, 0); break
+            case 'd': case 'D': case 'ArrowRight': this.tryMove(1, 0); break
+            case 'w': case 'W': case 'ArrowUp': this.tryJump(); break
+            case 's': case 'S': case 'ArrowDown': this.tryMove(0, 1); break
         }
 
-        if (beforeX !== this.player.x || beforeY !== this.player.y) {
-            this.trackMovementHunger()
-        }
-
+        if (beforeX !== this.player.x || beforeY !== this.player.y) this.trackMovementHunger()
         e.preventDefault()
     }
 
     private onKeyUp(e: KeyboardEvent): void {
         if (e.key === 'Shift') {
-            if (!this.world.isSolid(this.player.x, this.player.y - 1)) {
-                this.player.sneaking = false
-            }
+            if (!this.world.isSolid(this.player.x, this.player.y - 1)) this.player.sneaking = false
         }
     }
 
@@ -314,7 +309,6 @@ class MC2D {
         const scaleY = this.canvas.height / rect.height
         const mx = (e.clientX - rect.left) * scaleX
         const my = (e.clientY - rect.top) * scaleY
-
         this.hoverX = Math.floor(mx / this.cellSize + this.camera.x)
         this.hoverY = Math.floor(my / this.cellSize + this.camera.y)
     }
@@ -322,7 +316,6 @@ class MC2D {
     private onMouseDown(e: MouseEvent): void {
         if (!this.running || this.paused || this.gameOver || this.backpackOpen) return
         if (this.hoverX < 0 || this.hoverY < 0) return
-
         this.mouseDownButton = e.button
         this.applyMouseAction(e.button)
         this.startHold()
@@ -354,15 +347,9 @@ class MC2D {
 
     private applyMouseAction(button: number): void {
         if (this.hoverX < 0 || this.hoverY < 0) return
-
-        if (button === 0) {
-            this.breakBlock(this.hoverX, this.hoverY)
-        } else if (button === 2) {
-            this.placeBlock(this.hoverX, this.hoverY)
-        }
+        if (button === 0) this.breakBlock(this.hoverX, this.hoverY)
+        else if (button === 2) this.placeBlock(this.hoverX, this.hoverY)
     }
-
-    // ==================== 玩家操作 ====================
 
     private tryMove(dx: number, dy: number): void {
         const nx = this.player.x + dx
@@ -387,15 +374,22 @@ class MC2D {
         return true
     }
 
-    // ==================== 挖掘/放置 ====================
-
     private breakBlock(x: number, y: number): void {
         const id = this.world.get(x, y)
         if (id === BlockId.Air) return
         if (BLOCKS[id].unbreakable) return
 
         this.world.set(x, y, BlockId.Air)
-        this.addItem(id, 1)
+
+        // 掉落物映射
+        let drop = id
+        if (id === BlockId.Stone) drop = BlockId.Cobble
+        else if (id === BlockId.CoalOre) drop = BlockId.Coal
+        else if (id === BlockId.IronOre) drop = BlockId.IronIngot
+        else if (id === BlockId.GoldOre) drop = BlockId.GoldIngot
+        else if (id === BlockId.DiamondOre) drop = BlockId.Diamond
+
+        this.addItem(drop, 1)
     }
 
     private placeBlock(x: number, y: number): void {
@@ -405,14 +399,14 @@ class MC2D {
             if (
                 (x === this.player.x && y === this.player.y) ||
                 (x === this.player.x && y === this.player.y - 1)
-            )
-                return
+            ) return
         } else {
             if (x === this.player.x && y === this.player.y) return
         }
 
         const slot = this.hotbar[this.selectedSlot]
         if (slot.id === null || slot.count <= 0) return
+        if (!BLOCKS[slot.id].placeable) return
 
         this.world.set(x, y, slot.id)
         slot.count--
@@ -423,8 +417,6 @@ class MC2D {
         this.updateHotbarUi()
         if (this.backpackOpen) this.renderBackpack()
     }
-
-    // ==================== 物品栏核心 ====================
 
     private addItem(id: number, count: number): void {
         count = this.stackInto(this.hotbar, id, count)
@@ -453,28 +445,41 @@ class MC2D {
         return count
     }
 
-    private getSlot(source: SlotSource, index: number): Stack {
-        return source === 'hotbar' ? this.hotbar[index] : this.backpack[index]
+    private getSlot(source: SlotSource, index: number): Stack | null {
+        if (source === 'hotbar') return this.hotbar[index]
+        if (source === 'backpack') return this.backpack[index]
+        if (source === 'craft') return this.craftGrid[index]
+        return null
     }
 
-    // ==================== 背包 UI ====================
+    // ==================== UI 渲染 ====================
 
     private updateHotbarUi(): void {
-        const slots = document.querySelectorAll<HTMLElement>('.mc2d-hotbar .mc2d-slot')
-        slots.forEach((el, idx) => {
+        document.querySelectorAll<HTMLElement>('.mc2d-hotbar .mc2d-slot').forEach((el, idx) => {
             this.updateSlotEl(el, this.hotbar[idx])
             el.classList.toggle('is-active', idx === this.selectedSlot)
         })
     }
 
     private renderBackpack(): void {
-        document
-            .querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="backpack"]')
-            .forEach((el, idx) => this.updateSlotEl(el, this.backpack[idx]))
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="backpack"]').forEach((el, idx) => {
+            this.updateSlotEl(el, this.backpack[idx])
+        })
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="hotbar"]').forEach((el, idx) => {
+            this.updateSlotEl(el, this.hotbar[idx])
+        })
+        document.querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="craft"]').forEach((el, idx) => {
+            this.updateSlotEl(el, this.craftGrid[idx])
+        })
 
-        document
-            .querySelectorAll<HTMLElement>('.mc2d-bp-slot[data-source="hotbar"]')
-            .forEach((el, idx) => this.updateSlotEl(el, this.hotbar[idx]))
+        // 结果格
+        const resultEl = document.getElementById('craft-result')!
+        const result = this.computeCraftResult()
+        if (result) {
+            this.updateSlotEl(resultEl, result)
+        } else {
+            this.updateSlotEl(resultEl, { id: null, count: 0 })
+        }
 
         this.drawPlayerModel()
         document.getElementById('bp-health')!.textContent = String(this.health)
@@ -499,6 +504,8 @@ class MC2D {
             this.heldEl.classList.add('is-visible')
             this.heldIconEl.style.background = BLOCKS[this.heldStack.id].color
             this.heldCountEl.textContent = String(this.heldStack.count)
+            this.heldEl.style.left = `${this.mouseX}px`
+            this.heldEl.style.top = `${this.mouseY}px`
         } else {
             this.heldEl.classList.remove('is-visible')
             this.heldCountEl.textContent = ''
@@ -510,18 +517,63 @@ class MC2D {
         this.renderBackpack()
     }
 
+    // ==================== 合成 ====================
+
+    private computeCraftResult(): Stack | null {
+        const grid = this.craftGrid.map(s => s.id)
+        const found = findRecipe(grid)
+        if (!found) return null
+        return { id: found.recipe.result.id, count: found.recipe.result.count }
+    }
+
+    private onCraftResultClick(): void {
+        const found = findRecipe(this.craftGrid.map(s => s.id))
+        if (!found) return
+
+        // 消耗
+        for (const idx of found.consume) {
+            const s = this.craftGrid[idx]
+            s.count--
+            if (s.count <= 0) {
+                s.id = null
+                s.count = 0
+            }
+        }
+
+        // 产出
+        let rest = this.stackInto(this.backpack, found.recipe.result.id, found.recipe.result.count)
+        if (rest > 0) rest = this.stackInto(this.hotbar, found.recipe.result.id, rest)
+
+        this.syncBothUis()
+    }
+
+    private showCraftResultTooltip(): void {
+        const result = this.computeCraftResult()
+        if (!result || result.id === null) {
+            this.hideTooltip()
+            return
+        }
+        const def = BLOCKS[result.id]
+        this.tooltipNameEl.textContent = def.name
+        this.tooltipHintEl.textContent = `点击合成 · 数量 ${result.count}`
+        this.tooltipEl.classList.add('is-visible')
+        this.tooltipEl.style.left = `${this.mouseX + 14}px`
+        this.tooltipEl.style.top = `${this.mouseY + 14}px`
+    }
+
     // ==================== 背包开关 ====================
 
     private toggleBackpack(): void {
         if (this.gameOver) return
         this.backpackOpen = !this.backpackOpen
         this.stopHold()
-        this.dragging = null
+        this.dragState = null
         this.hideTooltip()
 
-        // 关闭时把手上物品塞回背包
-        if (!this.backpackOpen && this.heldStack.id !== null) {
-            this.returnHeldToInventory()
+        if (!this.backpackOpen) {
+            // 关背包时把手上 + 合成格物品归还
+            if (this.heldStack.id !== null) this.returnHeldToInventory()
+            this.returnCraftGridToInventory()
         }
 
         const modal = document.getElementById('backpack-modal')!
@@ -535,74 +587,106 @@ class MC2D {
         const id = this.heldStack.id
         const count = this.heldStack.count
         if (id === null) return
-
         let rest = this.stackInto(this.backpack, id, count)
         if (rest > 0) rest = this.stackInto(this.hotbar, id, rest)
-        // 如果还塞不下，直接丢弃（避免玩家丢失 UI 状态）
-
         this.heldStack = { id: null, count: 0 }
+    }
+
+    private returnCraftGridToInventory(): void {
+        for (const slot of this.craftGrid) {
+            if (slot.id === null || slot.count <= 0) continue
+            let rest = this.stackInto(this.backpack, slot.id, slot.count)
+            if (rest > 0) rest = this.stackInto(this.hotbar, slot.id, rest)
+            slot.id = null
+            slot.count = 0
+        }
     }
 
     // ==================== Minecraft 交互 ====================
 
     private onSlotMouseDown(source: SlotSource, index: number, button: number, shift: boolean): void {
-        // 拖拽开始
-        this.dragging = {
-            button,
-            distributable: this.heldStack.id !== null,
-            visited: new Set<string>()
-        }
-
-        if (button === 0) {
-            if (shift) {
-                this.quickMove(source, index)
-                return
-            }
-            this.leftClick(source, index)
-        } else if (button === 2) {
-            this.rightClick(source, index)
-        }
-    }
-
-    // 拖拽分发：鼠标移到其他格子时被调用
-    private onSlotDragEnter(source: SlotSource, index: number): void {
-        if (!this.dragging) return
-        const key = `${source}:${index}`
-        if (this.dragging.visited.has(key)) return
-        this.dragging.visited.add(key)
-
-        if (!this.dragging.distributable) return
-
-        const slot = this.getSlot(source, index)
-        const held = this.heldStack
-        if (held.id === null || held.count <= 0) return
-
-        if (slot.id === null) {
-            slot.id = held.id
-            slot.count = 1
-            held.count--
-        } else if (slot.id === held.id && slot.count < MAX_STACK) {
-            slot.count++
-            held.count--
-        } else {
+        if (shift) {
+            this.quickMove(source, index)
             return
         }
 
-        if (held.count <= 0) {
-            this.heldStack = { id: null, count: 0 }
-            this.dragging = null
+        const key = `${source}:${index}`
+        const slot = this.getSlot(source, index)
+        if (!slot) return
+        const held = this.heldStack
+
+        this.dragState = {
+            button,
+            startSource: source,
+            startIndex: index,
+            visited: new Set([key]),
+            startedWithHeld: held.id !== null,
+            placeDone: false
         }
 
-        this.syncBothUis()
+        if ((button === 0 || button === 2) && held.id !== null && held.count > 0) {
+            if (slot.id === null || slot.id === held.id) {
+                if (this.tryPlaceOne(slot, held)) {
+                    this.dragState.placeDone = true
+                    this.syncBothUis()
+                }
+            }
+        }
     }
 
-    // 左键：拿起全部 / 放下全部 / 交换 / 合并
+    private onSlotDragEnter(source: SlotSource, index: number): void {
+        if (!this.dragState) return
+        const key = `${source}:${index}`
+        if (this.dragState.visited.has(key)) return
+        this.dragState.visited.add(key)
+
+        const held = this.heldStack
+        if (held.id === null || held.count <= 0) return
+
+        const slot = this.getSlot(source, index)
+        if (!slot) return
+        if (slot.id !== null && slot.id !== held.id) return
+        if (slot.id === held.id && slot.count >= MAX_STACK) return
+
+        if (this.tryPlaceOne(slot, held)) this.syncBothUis()
+    }
+
+    private endDrag(): void {
+        if (!this.dragState) return
+        const drag = this.dragState
+        this.dragState = null
+
+        if (drag.visited.size !== 1) return
+
+        if (drag.button === 0) {
+            this.leftClick(drag.startSource, drag.startIndex)
+        } else if (drag.button === 2) {
+            if (!drag.startedWithHeld || !drag.placeDone) {
+                this.rightClick(drag.startSource, drag.startIndex)
+            }
+        }
+    }
+
+    private tryPlaceOne(slot: Stack, held: Stack): boolean {
+        if (held.id === null || held.count <= 0) return false
+        if (slot.id === null) {
+            slot.id = held.id
+            slot.count = 1
+        } else if (slot.id === held.id && slot.count < MAX_STACK) {
+            slot.count++
+        } else return false
+
+        held.count--
+        if (held.count <= 0) this.heldStack = { id: null, count: 0 }
+        return true
+    }
+
     private leftClick(source: SlotSource, index: number): void {
         const slot = this.getSlot(source, index)
+        if (!slot) return
         const held = this.heldStack
 
         if (held.id === null) {
-            // 手上没东西 → 拿起全部
             if (slot.id !== null && slot.count > 0) {
                 this.heldStack = { id: slot.id, count: slot.count }
                 slot.id = null
@@ -610,35 +694,30 @@ class MC2D {
             }
         } else {
             if (slot.id === null) {
-                // 空格 → 放下全部
                 slot.id = held.id
                 slot.count = held.count
                 this.heldStack = { id: null, count: 0 }
             } else if (slot.id === held.id) {
-                // 同类 → 尽量堆叠
                 const add = Math.min(held.count, MAX_STACK - slot.count)
                 slot.count += add
                 held.count -= add
                 if (held.count <= 0) this.heldStack = { id: null, count: 0 }
             } else {
-                // 不同类 → 交换
                 const tmp = { id: slot.id, count: slot.count }
                 slot.id = held.id
                 slot.count = held.count
                 this.heldStack = tmp
             }
         }
-
         this.syncBothUis()
     }
 
-    // 右键：拿一半 / 放一个
     private rightClick(source: SlotSource, index: number): void {
         const slot = this.getSlot(source, index)
+        if (!slot) return
         const held = this.heldStack
 
         if (held.id === null) {
-            // 手空 → 拿起一半（向上取整）
             if (slot.id !== null && slot.count > 0) {
                 const half = Math.ceil(slot.count / 2)
                 this.heldStack = { id: slot.id, count: half }
@@ -649,7 +728,6 @@ class MC2D {
                 }
             }
         } else {
-            // 手上有 → 放一个
             if (slot.id === null) {
                 slot.id = held.id
                 slot.count = 1
@@ -657,61 +735,51 @@ class MC2D {
             } else if (slot.id === held.id && slot.count < MAX_STACK) {
                 slot.count++
                 held.count--
-            } else {
-                return
-            }
+            } else return
             if (held.count <= 0) this.heldStack = { id: null, count: 0 }
         }
-
         this.syncBothUis()
     }
 
-    // Shift + 左键：快速移动到另一个容器
     private quickMove(source: SlotSource, index: number): void {
         const slot = this.getSlot(source, index)
-        if (slot.id === null || slot.count <= 0) return
+        if (!slot || slot.id === null || slot.count <= 0) return
 
-        const target = source === 'hotbar' ? this.backpack : this.hotbar
+        const target =
+            source === 'hotbar' ? this.backpack : this.hotbar
+
         const remaining = this.stackInto(target, slot.id, slot.count)
-
         if (remaining === 0) {
             slot.id = null
             slot.count = 0
         } else if (remaining < slot.count) {
             slot.count = remaining
         }
-        // 若完全放不下，保持不变
-
         this.syncBothUis()
     }
 
-    // ==================== Tooltip ====================
-
     private showTooltipFor(source: SlotSource, index: number): void {
         const slot = this.getSlot(source, index)
-        if (slot.id === null || slot.count <= 0) {
+        if (!slot || slot.id === null || slot.count <= 0) {
             this.hideTooltip()
             return
         }
-
         const def = BLOCKS[slot.id]
         this.tooltipNameEl.textContent = def.name
-
-        const tips: string[] = []
-        tips.push(`数量 ${slot.count}`)
+        const tips: string[] = [`数量 ${slot.count}`]
         if (def.unbreakable) tips.push('无法破坏')
-        tips.push('左键拿起 · 右键拿一半 · Shift+左键快移')
-
+        if (def.food) tips.push(`食用回复 ${def.food} 饥饿`)
+        if (def.toolLevel) tips.push(`工具等级 ${def.toolLevel}`)
+        if (!def.placeable && !def.food) tips.push('不可放置')
         this.tooltipHintEl.textContent = tips.join(' · ')
         this.tooltipEl.classList.add('is-visible')
+        this.tooltipEl.style.left = `${this.mouseX + 14}px`
+        this.tooltipEl.style.top = `${this.mouseY + 14}px`
     }
 
     private hideTooltip(): void {
         this.tooltipEl.classList.remove('is-visible')
     }
-
-    // 拖拽分发 - 在鼠标划过格子时触发
-    // 挂到 mousemove 上（通过 mouseenter 已经可以了，见 bindEvents）
 
     // ==================== 人物模型 ====================
 
@@ -723,7 +791,6 @@ class MC2D {
         const H = canvas.height
 
         ctx.clearRect(0, 0, W, H)
-
         ctx.fillStyle = 'rgba(0,0,0,0.08)'
         ctx.fillRect(0, H - 12, W, 12)
 
@@ -743,25 +810,20 @@ class MC2D {
 
         ctx.fillStyle = '#ffd5b5'
         ctx.fillRect(headX, startY, headW, headH)
-
         ctx.fillStyle = '#6b4226'
         ctx.fillRect(headX, startY, headW, px * 1.4)
-
         ctx.fillStyle = '#1a1a1a'
         ctx.fillRect(headX + px * 0.9, startY + px * 1.9, px * 0.55, px * 0.7)
         ctx.fillRect(headX + px * 2.55, startY + px * 1.9, px * 0.55, px * 0.7)
-
         ctx.fillStyle = '#b8826a'
         ctx.fillRect(headX + px * 1.5, startY + px * 3.1, px * 1, px * 0.4)
 
         const bodyY = startY + headH
         ctx.fillStyle = '#3498db'
         ctx.fillRect(bodyX, bodyY, bodyW, bodyH)
-
         ctx.fillStyle = '#2b7fc1'
         ctx.fillRect(bodyX - armW, bodyY, armW, bodyH - px)
         ctx.fillRect(bodyX + bodyW, bodyY, armW, bodyH - px)
-
         ctx.fillStyle = '#ffd5b5'
         ctx.fillRect(bodyX - armW, bodyY + bodyH - px, armW, px)
         ctx.fillRect(bodyX + bodyW, bodyY + bodyH - px, armW, px)
@@ -771,7 +833,6 @@ class MC2D {
         const legW = bodyW / 2 - 1
         ctx.fillRect(bodyX, legY, legW, legH)
         ctx.fillRect(bodyX + bodyW - legW, legY, legW, legH)
-
         ctx.fillStyle = '#1a1a1a'
         ctx.fillRect(bodyX, legY + legH - 4, legW, 4)
         ctx.fillRect(bodyX + bodyW - legW, legY + legH - 4, legW, 4)
@@ -819,7 +880,6 @@ class MC2D {
             div.dataset.kind = 'health'
             healthEl.appendChild(div)
         }
-
         hungerEl.innerHTML = ''
         for (let i = 0; i < MAX_HUNGER; i++) {
             const div = document.createElement('span')
@@ -836,8 +896,6 @@ class MC2D {
     private hideGameOver(): void {
         document.getElementById('game-over-modal')!.classList.remove('is-open')
     }
-
-    // ==================== 游戏控制 ====================
 
     private togglePause(): void {
         if (this.gameOver) return
@@ -857,19 +915,12 @@ class MC2D {
         requestAnimationFrame(t => this.loop(t))
     }
 
-    // ==================== 主循环 ====================
-
     private loop(time: number): void {
         if (!this.running) return
-
         const dt = Math.min(time - this.lastTime, 100)
         this.lastTime = time
-
-        if (!this.paused && !this.backpackOpen) {
-            this.update(dt, time)
-        }
+        if (!this.paused && !this.backpackOpen) this.update(dt, time)
         this.render()
-
         requestAnimationFrame(t => this.loop(t))
     }
 
@@ -881,11 +932,9 @@ class MC2D {
 
     private updateGravity(time: number): void {
         if (time < this.jumpLockedUntil) return
-
         const p = this.player
         const below = p.y + 1
         const canFall = !this.world.isSolid(p.x, below)
-
         if (canFall) {
             p.onGround = false
             if (time - p.lastFallTime > GRAVITY_INTERVAL) {
@@ -916,7 +965,6 @@ class MC2D {
         const viewRows = this.canvas.height / this.cellSize
         const targetX = this.player.x - viewCols / 2
         const targetY = this.player.y - viewRows / 2
-
         this.camera.x += (targetX - this.camera.x) * 0.15
         this.camera.y += (targetY - this.camera.y) * 0.15
     }
@@ -924,7 +972,6 @@ class MC2D {
     private render(): void {
         this.renderer.clear()
         this.renderer.drawWorld(this.world, this.camera, this.cellSize)
-
         if (
             this.hoverX >= 0 &&
             this.hoverY >= 0 &&
@@ -932,7 +979,6 @@ class MC2D {
         ) {
             this.renderer.drawTargetHighlight(this.hoverX, this.hoverY, this.camera, this.cellSize)
         }
-
         this.renderer.drawPlayer(this.player, this.camera, this.cellSize)
     }
 }

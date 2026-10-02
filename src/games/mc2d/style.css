@@ -559,3 +559,66 @@ body {
     color: #aaa;
     margin-top: 2px;
 }
+
+/* ============================================
+   合成区
+   ============================================ */
+
+.mc2d-craft {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 10px 0 14px;
+}
+
+.mc2d-craft__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    grid-template-rows: repeat(3, 44px);
+    gap: 4px;
+}
+
+.mc2d-craft__arrow {
+    font-size: 22px;
+    color: var(--text-tertiary);
+    font-weight: 700;
+    user-select: none;
+}
+
+.mc2d-craft__result {
+    padding: 4px;
+    border-radius: 10px;
+    border: 2px dashed var(--border-default);
+}
+
+.mc2d-craft__result:has(.mc2d-slot__icon[style*="background: rgb"]) {
+    border-style: solid;
+    border-color: var(--accent);
+}
+
+.mc2d-bp-slot--result {
+    width: 44px;
+    height: 44px;
+    border-width: 1px;
+    background: var(--accent-subtle);
+}
+
+@media (max-width: 640px) {
+    .mc2d-craft__grid {
+        grid-template-columns: repeat(3, 36px);
+        grid-template-rows: repeat(3, 36px);
+        gap: 3px;
+    }
+
+    .mc2d-bp-slot--result {
+        width: 36px;
+        height: 36px;
+    }
+
+    .mc2d-craft__arrow {
+        font-size: 18px;
+    }
+}
+
+/* 面包/苹果使用色块 + emoji 风格图标（用圆点代替复杂图案） */
