@@ -1,6 +1,6 @@
 import { BLOCKS, BlockId } from './constants'
-import type { World } from './world'
 import { getTexture } from './textures'
+import type { World } from './world'
 
 export interface Camera {
     x: number
@@ -20,19 +20,38 @@ export interface LightSource {
 }
 
 export class Renderer {
+    private dpr = 1
+
     constructor(
         private readonly ctx: CanvasRenderingContext2D,
         private readonly canvas: HTMLCanvasElement
     ) { }
 
+    setDpr(dpr: number): void {
+        this.dpr = dpr
+    }
+
+    /** 逻辑宽度（CSS 像素） */
+    private get cssW(): number {
+        return this.canvas.width / this.dpr
+    }
+
+    /** 逻辑高度（CSS 像素） */
+    private get cssH(): number {
+        return this.canvas.height / this.dpr
+    }
+
     clear(): void {
+        this.ctx.imageSmoothingEnabled = false
         this.ctx.fillStyle = '#87ceeb'
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+        this.ctx.fillRect(0, 0, this.cssW, this.cssH)
     }
 
     drawWorld(world: World, camera: Camera, cellSize: number): void {
-        const viewCols = Math.ceil(this.canvas.width / cellSize)
-        const viewRows = Math.ceil(this.canvas.height / cellSize)
+        this.ctx.imageSmoothingEnabled = false
+
+        const viewCols = Math.ceil(this.cssW / cellSize)
+        const viewRows = Math.ceil(this.cssH / cellSize)
         const startX = Math.floor(camera.x)
         const startY = Math.floor(camera.y)
 
@@ -58,9 +77,8 @@ export class Renderer {
         const img = getTexture(block)
 
         if (img) {
-            ctx.drawImage(img, x, y, size, size)
+            ctx.drawImage(img, Math.round(x), Math.round(y), Math.round(size), Math.round(size))
         } else {
-            // 兜底：色块
             ctx.fillStyle = def.color
             ctx.fillRect(x, y, size, size)
             ctx.fillStyle = 'rgba(255,255,255,0.18)'
@@ -69,12 +87,6 @@ export class Renderer {
             ctx.fillRect(x + size - Math.max(1, size * 0.08), y, Math.max(1, size * 0.08), size)
         }
 
-        // 火把额外发光
-        if (block === BlockId.Torch && img) {
-            // 已由光照层处理，这里不再叠加
-        }
-
-        // 网格线
         if (size >= 16) {
             ctx.strokeStyle = 'rgba(0,0,0,0.12)'
             ctx.lineWidth = 1
@@ -82,16 +94,12 @@ export class Renderer {
         }
     }
 
-    drawLights(
-        lights: LightSource[],
-        camera: Camera,
-        cellSize: number
-    ): void {
+    drawLights(lights: LightSource[], camera: Camera, cellSize: number): void {
         if (lights.length === 0) return
 
         const ctx = this.ctx
-        const viewCols = Math.ceil(this.canvas.width / cellSize)
-        const viewRows = Math.ceil(this.canvas.height / cellSize)
+        const viewCols = Math.ceil(this.cssW / cellSize)
+        const viewRows = Math.ceil(this.cssH / cellSize)
 
         ctx.save()
         ctx.globalCompositeOperation = 'lighter'
@@ -118,31 +126,41 @@ export class Renderer {
 
     drawPlayer(player: PlayerView, camera: Camera, cellSize: number): void {
         const ctx = this.ctx
+        const height = player.sneaking ? 1 : 2
+
         const sx = (player.x - camera.x) * cellSize
         const sy = (player.y - camera.y) * cellSize
+        const bodyW = cellSize * 0.8
+        const bodyH = cellSize * height
+        const bodyX = sx + (cellSize - bodyW) / 2
 
-        const bodyTop = player.sneaking ? sy : sy - cellSize
-        const height = player.sneaking ? cellSize : cellSize * 2
-        const bodyWidth = cellSize * 0.7
-        const bodyX = sx + (cellSize - bodyWidth) / 2
+        const headH = bodyH * 0.4
 
-        const headH = height * 0.4
+        // 头
         ctx.fillStyle = '#ffd5b5'
-        ctx.fillRect(bodyX, bodyTop, bodyWidth, headH)
+        ctx.fillRect(bodyX, sy, bodyW, headH)
 
+        // 头发
         ctx.fillStyle = '#6b4226'
-        ctx.fillRect(bodyX, bodyTop, bodyWidth, headH * 0.3)
+        ctx.fillRect(bodyX, sy, bodyW, headH * 0.3)
 
-        const torsoY = bodyTop + headH
-        const torsoH = height - headH
+        // 眼睛
+        ctx.fillStyle = '#1a1a1a'
+        ctx.fillRect(bodyX + bodyW * 0.2, sy + headH * 0.5, bodyW * 0.12, headH * 0.15)
+        ctx.fillRect(bodyX + bodyW * 0.68, sy + headH * 0.5, bodyW * 0.12, headH * 0.15)
+
+        // 身体
+        const torsoY = sy + headH
+        const torsoH = bodyH * 0.6
         ctx.fillStyle = '#3498db'
-        ctx.fillRect(bodyX, torsoY, bodyWidth, torsoH * 0.7)
+        ctx.fillRect(bodyX, torsoY, bodyW, torsoH * 0.7)
 
+        // 腿
         ctx.fillStyle = '#2c3e50'
         const legH = torsoH * 0.3
-        const legW = bodyWidth * 0.45
+        const legW = bodyW * 0.45
         ctx.fillRect(bodyX, torsoY + torsoH * 0.7, legW, legH)
-        ctx.fillRect(bodyX + bodyWidth - legW, torsoY + torsoH * 0.7, legW, legH)
+        ctx.fillRect(bodyX + bodyW - legW, torsoY + torsoH * 0.7, legW, legH)
     }
 
     drawTargetHighlight(

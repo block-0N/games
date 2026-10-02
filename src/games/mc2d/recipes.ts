@@ -24,11 +24,6 @@ export const RECIPES_2X2: Recipe[] = [
         result: { id: BlockId.CraftingTable, count: 1 }
     },
     {
-        pattern: ['CC', 'CC'],
-        keys: { C: BlockId.Cobble },
-        result: { id: BlockId.Furnace, count: 1 }
-    },
-    {
         pattern: ['C', 'S'],
         keys: { C: BlockId.Coal, S: BlockId.Stick },
         result: { id: BlockId.Torch, count: 4 }
@@ -38,6 +33,12 @@ export const RECIPES_2X2: Recipe[] = [
 // 3x3 配方（工作台）
 export const RECIPES_3X3: Recipe[] = [
     ...RECIPES_2X2,
+    {
+        // 8 个圆石围一圈（中空）
+        pattern: ['CCC', 'C C', 'CCC'],
+        keys: { C: BlockId.Cobble },
+        result: { id: BlockId.Furnace, count: 1 }
+    },
     {
         pattern: ['PPP', ' S ', ' S '],
         keys: { P: BlockId.Plank, S: BlockId.Stick },

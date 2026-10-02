@@ -8,7 +8,10 @@ import {
     BLOCKS,
     HOTBAR_SIZE,
     MAX_STACK,
-    GRAVITY_INTERVAL,
+    GRAVITY,
+    MAX_FALL_SPEED,
+    JUMP_VELOCITY,
+    MAX_JUMP_RISE,
     MOVE_HUNGER_STEP,
     MAX_HEALTH,
     MAX_HUNGER,
@@ -16,6 +19,7 @@ import {
     HEAL_INTERVAL,
     FALL_SAFE_DISTANCE,
     FURNACE_SMELT_MS,
+    TICK_MS,
     TOOL_MULTIPLIER
 } from './constants'
 import { findRecipe2x2, findRecipe3x3 } from './crafting'
@@ -33,6 +37,9 @@ interface Player {
     sneaking: boolean
     onGround: boolean
     lastFallTime: number
+    vy: number
+    fellFrom: number
+    jumpStartY: number
 }
 
 interface FurnaceState {
@@ -97,12 +104,13 @@ class MC2D {
     private running = false
     private paused = false
     private gameOver = false
-    private jumpLockedUntil = 0
 
     private hoverX = -1
     private hoverY = -1
 
     private mouseDownButton = -1
+    private rightHoldTimer: number | null = null
+    private rightHolding = false
     private mouseX = 0
     private mouseY = 0
 
@@ -135,7 +143,10 @@ class MC2D {
             y: spawnY,
             sneaking: false,
             onGround: false,
-            lastFallTime: 0
+            lastFallTime: 0,
+            vy: 0,
+            fellFrom: spawnY,
+            jumpStartY: spawnY
         }
 
         this.hotbar = this.createSlots(HOTBAR_SIZE)
@@ -236,14 +247,23 @@ class MC2D {
 
         const cols = Math.ceil(rect.width / this.cellSize)
         const rows = Math.ceil(rect.height / this.cellSize)
+        const dpr = window.devicePixelRatio || 1
 
-        this.canvas.width = cols * this.cellSize
-        this.canvas.height = rows * this.cellSize
-        this.canvas.style.width = `${this.canvas.width}px`
-        this.canvas.style.height = `${this.canvas.height}px`
+        // 物理像素 = 逻辑像素 × dpr
+        this.canvas.width = cols * this.cellSize * dpr
+        this.canvas.height = rows * this.cellSize * dpr
+        // CSS 尺寸 = 逻辑像素
+        this.canvas.style.width = `${cols * this.cellSize}px`
+        this.canvas.style.height = `${rows * this.cellSize}px`
+
+        // 让后续所有绘制都用逻辑坐标（CSS 像素）
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        this.ctx.imageSmoothingEnabled = false
+
+        this.renderer.setDpr(dpr)
 
         this.camera.x = this.player.x - cols / 2
-        this.camera.y = this.player.y - rows / 2
+        this.camera.y = this.player.y - 0.5 - rows / 2
     }
 
     private bindEvents(): void {
@@ -257,6 +277,7 @@ class MC2D {
         this.canvas.addEventListener('mouseleave', () => {
             this.hoverX = -1
             this.hoverY = -1
+            this.stopRightHold()
         })
         this.canvas.addEventListener('contextmenu', e => e.preventDefault())
 
@@ -273,7 +294,10 @@ class MC2D {
             }
         })
 
-        document.addEventListener('mouseup', () => this.endDrag())
+        document.addEventListener('mouseup', () => {
+            this.endDrag()
+            this.stopRightHold()
+        })
 
         this.canvas.addEventListener(
             'wheel',
@@ -327,6 +351,18 @@ class MC2D {
             this.onSlotMouseDown(source, index, (e as MouseEvent).button, (e as MouseEvent).shiftKey)
         })
 
+        document.addEventListener('dblclick', e => {
+            const el = (e.target as HTMLElement).closest?.('.mc2d-bp-slot') as HTMLElement | null
+            if (!el) return
+            const source = el.dataset.source as SlotSource | undefined
+            if (!source) return
+            if (source !== 'hotbar' && source !== 'backpack') return
+            const index = parseInt(el.dataset.index ?? '0', 10)
+            e.preventDefault()
+            e.stopPropagation()
+            this.mergeStacks(source, index)
+        }, true)
+
         document.addEventListener('mouseenter', e => {
             const el = (e.target as HTMLElement).closest?.('.mc2d-bp-slot') as HTMLElement | null
             if (!el) return
@@ -367,8 +403,11 @@ class MC2D {
 
         if (e.key === 'e' || e.key === 'E') {
             if (this.paused) return
-            if (this.uiMode === 'backpack' || this.uiMode === 'workbench') this.closeUi()
-            else this.toggleBackpack()
+            if (this.uiMode !== 'none') {
+                this.closeUi()
+            } else {
+                this.toggleBackpack()
+            }
             e.preventDefault()
             return
         }
@@ -386,7 +425,9 @@ class MC2D {
             return
         }
 
-        if (e.key === 'Shift') {
+        if (e.key === 'Shift' && !this.player.sneaking) {
+            // 蹲下：脚不动，头顶下移 1 格
+            this.player.y += 1
             this.player.sneaking = true
             return
         }
@@ -406,17 +447,32 @@ class MC2D {
     }
 
     private onKeyUp(e: KeyboardEvent): void {
-        if (e.key === 'Shift') {
-            if (!this.world.isSolid(this.player.x, this.player.y - 1)) this.player.sneaking = false
+        if (e.key === 'Shift' && this.player.sneaking) {
+            // 起身：检查头顶格是否空
+            const newTopCell = Math.floor(this.player.y - 1 + 0.001)
+            if (!this.world.isSolid(this.player.x, newTopCell)) {
+                this.player.y -= 1
+                this.player.sneaking = false
+            }
         }
     }
 
     private onMouseMove(e: MouseEvent): void {
         const rect = this.canvas.getBoundingClientRect()
+        const dpr = window.devicePixelRatio || 1
+
+        // canvas 物理像素 / 显示尺寸 = 物理→显示的缩放比
         const scaleX = this.canvas.width / rect.width
         const scaleY = this.canvas.height / rect.height
-        const mx = (e.clientX - rect.left) * scaleX
-        const my = (e.clientY - rect.top) * scaleY
+
+        // 鼠标在物理像素中的位置
+        const px = (e.clientX - rect.left) * scaleX
+        const py = (e.clientY - rect.top) * scaleY
+
+        // 物理像素 → 逻辑像素（除以 dpr，因为绘制时用了 setTransform(dpr, ...)）
+        const mx = px / dpr
+        const my = py / dpr
+
         this.hoverX = Math.floor(mx / this.cellSize + this.camera.x)
         this.hoverY = Math.floor(my / this.cellSize + this.camera.y)
     }
@@ -429,12 +485,49 @@ class MC2D {
         this.mouseDownButton = e.button
 
         if (e.button === 0) {
-            // 左键开始挖
             this.startMining(this.hoverX, this.hoverY)
         } else if (e.button === 2) {
-            // 右键：交互/放置
             this.onRightClick()
+            // 如果手持可放置方块且还有剩余，启动长按重复
+            const slot = this.hotbar[this.selectedSlot]
+            if (slot.id !== null && slot.count > 0 && BLOCKS[slot.id].placeable) {
+                this.startRightHold()
+            }
         }
+    }
+
+    private startRightHold(): void {
+        this.stopRightHold()
+        this.rightHolding = true
+        this.rightHoldTimer = window.setTimeout(() => {
+            this.rightHoldTimer = null
+            if (!this.rightHolding) return
+            const placed = this.tryPlaceAtHover()
+            if (placed) {
+                this.startRightHold()
+            } else {
+                this.stopRightHold()
+            }
+        }, 200)
+    }
+
+    private stopRightHold(): void {
+        this.rightHolding = false
+        if (this.rightHoldTimer !== null) {
+            clearTimeout(this.rightHoldTimer)
+            this.rightHoldTimer = null
+        }
+    }
+
+    private tryPlaceAtHover(): boolean {
+        if (this.hoverX < 0 || this.hoverY < 0) return false
+        const slot = this.hotbar[this.selectedSlot]
+        if (slot.id === null || slot.count <= 0) return false
+        if (!BLOCKS[slot.id].placeable) return false
+
+        const before = slot.count
+        this.placeBlock(this.hoverX, this.hoverY)
+        return slot.count < before
     }
 
     private onRightClick(): void {
@@ -552,14 +645,10 @@ class MC2D {
     private placeBlock(x: number, y: number): void {
         if (this.world.get(x, y) !== BlockId.Air) return
 
-        if (!this.player.sneaking) {
-            if (
-                (x === this.player.x && y === this.player.y) ||
-                (x === this.player.x && y === this.player.y - 1)
-            ) return
-        } else {
-            if (x === this.player.x && y === this.player.y) return
-        }
+        const height = this.player.sneaking ? 1 : 2
+        const topCell = Math.floor(this.player.y)
+        const bottomCell = Math.floor(this.player.y + height - 0.001)
+        if (x === this.player.x && y >= topCell && y <= bottomCell) return
 
         const slot = this.hotbar[this.selectedSlot]
         if (slot.id === null || slot.count <= 0) return
@@ -578,27 +667,33 @@ class MC2D {
 
     // ==================== 玩家移动 ====================
 
-    private tryMove(dx: number, dy: number): void {
-        const nx = this.player.x + dx
-        const ny = this.player.y + dy
-        if (!this.canOccupy(nx, ny)) return
-        this.player.x = nx
-        this.player.y = ny
+    private tryMove(dx: number, _dy: number): void {
+        const p = this.player
+        const nx = p.x + dx
+        const height = p.sneaking ? 1 : 2
+
+        const topCell = Math.floor(p.y)
+        const bottomCell = Math.floor(p.y + height - 0.001)
+
+        for (let cy = topCell; cy <= bottomCell; cy++) {
+            if (this.world.isSolid(nx, cy)) return
+        }
+
+        p.x = nx
     }
 
     private tryJump(): void {
         if (!this.player.onGround) return
-        const ny = this.player.y - 1
-        if (!this.canOccupy(this.player.x, ny)) return
-        this.player.y = ny
-        this.player.onGround = false
-        this.jumpLockedUntil = performance.now() + 260
-    }
 
-    private canOccupy(x: number, y: number): boolean {
-        if (this.world.isSolid(x, y)) return false
-        if (!this.player.sneaking && this.world.isSolid(x, y - 1)) return false
-        return true
+        // 头顶有空间才能跳
+        const headCell = Math.floor(this.player.y - 0.1)
+        if (this.world.isSolid(this.player.x, headCell)) return
+
+        this.player.vy = JUMP_VELOCITY
+        this.player.onGround = false
+        this.player.fellFrom = this.player.y
+        this.player.jumpStartY = this.player.y
+        this.player.lastFallTime = performance.now()
     }
 
     private addItem(id: number, count: number): void {
@@ -843,48 +938,56 @@ class MC2D {
 
     private tickFurnace(f: FurnaceState, dt: number): void {
         const smelt = findSmelt(f.input.id)
-
-        const canOutput =
+        const canSmelt =
             smelt !== null &&
             f.input.count > 0 &&
-            (f.output.id === null || (f.output.id === smelt.output && f.output.count < MAX_STACK))
+            (f.output.id === null ||
+                (f.output.id === smelt.output && f.output.count + smelt.count <= MAX_STACK))
 
-        // 消耗燃料
-        if (f.burnTimeLeft <= 0 && canOutput && f.fuel.id !== null && f.fuel.count > 0) {
-            const fuelDef = BLOCKS[f.fuel.id]
-            if (fuelDef.fuel) {
-                f.burnTimeLeft = fuelDef.fuel * 1000
-                f.burnTimeMax = f.burnTimeLeft
-                f.fuel.count--
-                if (f.fuel.count <= 0) {
-                    f.fuel.id = null
-                    f.fuel.count = 0
+        // 1. 若未在燃烧，检查是否应该点燃新的燃料
+        if (f.burnTimeLeft <= 0) {
+            if (canSmelt && f.fuel.id !== null && f.fuel.count > 0) {
+                const fuelTicks = BLOCKS[f.fuel.id].fuel ?? 0
+                if (fuelTicks > 0) {
+                    f.burnTimeMax = fuelTicks * TICK_MS
+                    f.burnTimeLeft = f.burnTimeMax
+                    f.fuel.count--
+                    if (f.fuel.count <= 0) {
+                        f.fuel.id = null
+                        f.fuel.count = 0
+                    }
                 }
             }
         }
 
+        // 2. 燃烧中：消耗燃烧时间
         if (f.burnTimeLeft > 0) {
             f.burnTimeLeft -= dt
             if (f.burnTimeLeft < 0) f.burnTimeLeft = 0
-        }
 
-        if (canOutput && f.burnTimeLeft > 0) {
-            f.smeltProgress += dt
-            if (f.smeltProgress >= FURNACE_SMELT_MS) {
+            // 3. 能否烧炼决定进度
+            if (canSmelt) {
+                f.smeltProgress += dt
+                if (f.smeltProgress >= FURNACE_SMELT_MS) {
+                    f.smeltProgress -= FURNACE_SMELT_MS
+                    if (f.output.id === null) {
+                        f.output.id = smelt!.output
+                        f.output.count = smelt!.count
+                    } else {
+                        f.output.count += smelt!.count
+                    }
+                    f.input.count--
+                    if (f.input.count <= 0) {
+                        f.input.id = null
+                        f.input.count = 0
+                    }
+                }
+            } else {
+                // 原版行为：不能烧时进度清零
                 f.smeltProgress = 0
-                if (f.output.id === null) {
-                    f.output.id = smelt!.output
-                    f.output.count = smelt!.count
-                } else {
-                    f.output.count += smelt!.count
-                }
-                f.input.count--
-                if (f.input.count <= 0) {
-                    f.input.id = null
-                    f.input.count = 0
-                }
             }
         } else {
+            // 未燃烧，进度清零
             f.smeltProgress = 0
         }
     }
@@ -1056,11 +1159,31 @@ class MC2D {
         const drag = this.dragState
         this.dragState = null
 
-        if (drag.visited.size !== 1) return
+        const isClick = drag.visited.size === 1
+        if (!isClick) return
 
         if (drag.button === 0) {
+            // 左键单击
+            if (drag.placeDone) {
+                // mousedown 已经放过 1 个了，剩余同类物品继续堆叠到同一格
+                const held = this.heldStack
+                const slot = this.getSlot(drag.startSource, drag.startIndex)
+                if (held.id !== null && slot && slot.id === held.id && slot.count < MAX_STACK) {
+                    const add = Math.min(held.count, MAX_STACK - slot.count)
+                    slot.count += add
+                    held.count -= add
+                    if (held.count <= 0) this.heldStack = { id: null, count: 0 }
+                    this.syncBothUis()
+                }
+                return
+            }
+            // mousedown 没放过 → 标准点击
             this.leftClick(drag.startSource, drag.startIndex)
-        } else if (drag.button === 2) {
+            return
+        }
+
+        if (drag.button === 2) {
+            // 右键单击
             if (!drag.startedWithHeld || !drag.placeDone) {
                 this.rightClick(drag.startSource, drag.startIndex)
             }
@@ -1157,6 +1280,54 @@ class MC2D {
         } else if (remaining < slot.count) {
             slot.count = remaining
         }
+        this.syncBothUis()
+    }
+
+    // 双击整理：把所有同类物品合并到双击的格，溢出按原顺序填回其他同类格
+    private mergeStacks(source: SlotSource, index: number): void {
+        // 手上持物时不整理，避免状态冲突
+        if (this.heldStack.id !== null) return
+
+        const target = this.getSlot(source, index)
+        if (!target || target.id === null || target.count <= 0) return
+
+        const id = target.id
+        const isHotbar = source === 'hotbar'
+        const isBackpack = source === 'backpack'
+        if (!isHotbar && !isBackpack) return
+
+        type Ref = { list: Stack[]; index: number }
+        const refs: Ref[] = []
+
+        // 双击格优先（合并后先填它）
+        refs.push({ list: isHotbar ? this.hotbar : this.backpack, index })
+
+        for (let i = 0; i < this.hotbar.length; i++) {
+            if (isHotbar && i === index) continue
+            if (this.hotbar[i].id === id) refs.push({ list: this.hotbar, index: i })
+        }
+        for (let i = 0; i < this.backpack.length; i++) {
+            if (isBackpack && i === index) continue
+            if (this.backpack[i].id === id) refs.push({ list: this.backpack, index: i })
+        }
+
+        // 统计总数并清空
+        let total = 0
+        for (const ref of refs) {
+            total += ref.list[ref.index].count
+            ref.list[ref.index].id = null
+            ref.list[ref.index].count = 0
+        }
+
+        // 按 refs 顺序填回
+        for (const ref of refs) {
+            if (total <= 0) break
+            const add = Math.min(total, MAX_STACK)
+            ref.list[ref.index].id = id
+            ref.list[ref.index].count = add
+            total -= add
+        }
+
         this.syncBothUis()
     }
 
@@ -1346,39 +1517,77 @@ class MC2D {
     }
 
     private updateGravity(time: number): void {
-        if (time < this.jumpLockedUntil) return
-
         const p = this.player
-        const below = p.y + 1
-        const canFall = !this.world.isSolid(p.x, below)
+        const height = p.sneaking ? 1 : 2
 
-        if (canFall) {
-            if (p.onGround) {
-                // 刚离开地面，记录起点
-                p.lastFallTime = time
-                // 用 lastFallTime 当作落地高度标记的起点，暂存在 sneaking 无关变量
-                // 这里用跳转标志简化：记录 fellFrom
-                this.fellFrom = p.y
+        const dt = Math.min(time - p.lastFallTime, 50)
+        p.lastFallTime = time
+
+        // ===== 站在地面：检查脚下方块并精确吸附 =====
+        if (p.onGround) {
+            p.vy = 0
+
+            // 玩家占 [y, y+height)，脚下方块是 y+height 所在的格子
+            const footCell = Math.floor(p.y + height - 0.001) + 1
+
+            if (this.world.isSolid(p.x, footCell)) {
+                // 精确吸附到地面顶部
+                p.y = footCell - height
+                return
             }
+
+            // 脚下空了，开始下落
             p.onGround = false
-            if (time - p.lastFallTime > GRAVITY_INTERVAL) {
-                p.y = below
-                p.lastFallTime = time
+            p.fellFrom = p.y
+        }
+
+        // ===== 施加重力 =====
+        p.vy += GRAVITY * dt
+        if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED
+        if (p.vy < JUMP_VELOCITY) p.vy = JUMP_VELOCITY
+
+        const newY = p.y + p.vy * dt
+
+        // ===== 上升 =====
+        if (p.vy < 0) {
+            const maxUpY = p.jumpStartY - MAX_JUMP_RISE
+            if (newY <= maxUpY) {
+                p.y = maxUpY
+                p.vy = 0
+                return
             }
-        } else {
-            if (!p.onGround && this.fellFrom >= 0) {
-                const fallDist = p.y - this.fellFrom
+
+            const fromCell = Math.floor(p.y)
+            const toCell = Math.floor(newY)
+            for (let cell = fromCell - 1; cell >= toCell; cell--) {
+                if (this.world.isSolid(p.x, cell)) {
+                    p.y = cell + 1
+                    p.vy = 0
+                    return
+                }
+            }
+            p.y = newY
+            return
+        }
+
+        // ===== 下降 =====
+        const fromFoot = Math.floor(p.y + height - 0.001)
+        const toFoot = Math.floor(newY + height - 0.001)
+        for (let cell = fromFoot + 1; cell <= toFoot; cell++) {
+            if (this.world.isSolid(p.x, cell)) {
+                p.y = cell - height
+                const fallDist = p.y - p.fellFrom
                 if (fallDist > FALL_SAFE_DISTANCE) {
                     const dmg = Math.floor(fallDist - FALL_SAFE_DISTANCE)
                     if (dmg > 0) this.changeHealth(-dmg)
                 }
-                this.fellFrom = -1
+                p.vy = 0
+                p.onGround = true
+                return
             }
-            p.onGround = true
         }
+        p.y = newY
     }
-
-    private fellFrom = -1
 
     private updateStarveHeal(time: number): void {
         if (this.hunger <= 0) {
@@ -1395,10 +1604,15 @@ class MC2D {
     }
 
     private updateCamera(): void {
-        const viewCols = this.canvas.width / this.cellSize
-        const viewRows = this.canvas.height / this.cellSize
-        const targetX = this.player.x - viewCols / 2
-        const targetY = this.player.y - viewRows / 2
+        const dpr = window.devicePixelRatio || 1
+        const viewCols = this.canvas.width / dpr / this.cellSize
+        const viewRows = this.canvas.height / dpr / this.cellSize
+
+        // 玩家中心（y 是顶部，+1 到身体中心）
+        const playerCenterY = this.player.y + (this.player.sneaking ? 0.5 : 1)
+        const targetX = this.player.x + 0.5 - viewCols / 2
+        const targetY = playerCenterY - viewRows / 2
+
         this.camera.x += (targetX - this.camera.x) * 0.15
         this.camera.y += (targetY - this.camera.y) * 0.15
     }

@@ -63,7 +63,7 @@ export const BLOCKS: Record<number, ItemDef> = {
     [BlockId.Grass]: { name: '草方块', color: '#4caf50', texture: 'grass', placeable: true, solid: true, breakTime: 350, drops: BlockId.Dirt },
     [BlockId.Log]: { name: '橡木原木', color: '#6d4c41', texture: 'log', placeable: true, solid: true, breakTime: 700 },
     [BlockId.Leaves]: { name: '橡树树叶', color: '#2e7d32', texture: 'leaves', placeable: true, solid: true, breakTime: 250, drops: BlockId.Apple, dropChance: 0.12 },
-    [BlockId.Plank]: { name: '橡木木板', color: '#a1887f', texture: 'plank', placeable: true, solid: true, breakTime: 600, fuel: 1 },
+    [BlockId.Plank]: { name: '橡木木板', color: '#a1887f', texture: 'plank', placeable: true, solid: true, breakTime: 600, fuel: 300 },
     [BlockId.CoalOre]: { name: '煤矿石', color: '#4a4a4a', texture: 'coal_ore', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400, drops: BlockId.Coal },
     [BlockId.IronOre]: { name: '铁矿石', color: '#a57c5c', texture: 'iron_ore', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawIron },
     [BlockId.GoldOre]: { name: '金矿石', color: '#c9a227', texture: 'gold_ore', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawGold },
@@ -72,15 +72,15 @@ export const BLOCKS: Record<number, ItemDef> = {
     [BlockId.Furnace]: { name: '熔炉', color: '#6b6b6b', texture: 'furnace', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400 },
     [BlockId.Torch]: { name: '火把', color: '#ffb300', texture: 'torch', placeable: true, solid: false, breakTime: 50, lightRadius: 6 },
 
-    [BlockId.Coal]: { name: '煤炭', color: '#1a1a1a', texture: 'coal', placeable: false, solid: false, fuel: 8 },
-    [BlockId.RawIron]: { name: '原铁', color: '#c9a68a', texture: 'raw_iron', placeable: false, solid: false },
-    [BlockId.RawGold]: { name: '原金', color: '#e0c060', texture: 'raw_gold', placeable: false, solid: false },
+    [BlockId.Coal]: { name: '煤炭', color: '#1a1a1a', texture: 'coal', placeable: false, solid: false, fuel: 1600 },
+    [BlockId.RawIron]: { name: '粗铁', color: '#c9a68a', texture: 'raw_iron', placeable: false, solid: false },
+    [BlockId.RawGold]: { name: '粗金', color: '#e0c060', texture: 'raw_gold', placeable: false, solid: false },
     [BlockId.IronIngot]: { name: '铁锭', color: '#cfcfcf', texture: 'iron_ingot', placeable: false, solid: false },
     [BlockId.GoldIngot]: { name: '金锭', color: '#f0d060', texture: 'gold_ingot', placeable: false, solid: false },
     [BlockId.Diamond]: { name: '钻石', color: '#4dd0e1', texture: 'diamond', placeable: false, solid: false },
-    [BlockId.Stick]: { name: '木棍', color: '#8a6c4a', texture: 'stick', placeable: false, solid: false, fuel: 1 },
+    [BlockId.Stick]: { name: '木棍', color: '#8a6c4a', texture: 'stick', placeable: false, solid: false, fuel: 100 },
 
-    [BlockId.WoodPickaxe]: { name: '木镐', color: '#c19a6b', texture: 'wood_pickaxe', placeable: false, solid: false, toolLevel: 1, fuel: 1 },
+    [BlockId.WoodPickaxe]: { name: '木镐', color: '#c19a6b', texture: 'wood_pickaxe', placeable: false, solid: false, toolLevel: 1, fuel: 200 },
     [BlockId.StonePickaxe]: { name: '石镐', color: '#9e9e9e', texture: 'stone_pickaxe', placeable: false, solid: false, toolLevel: 2 },
     [BlockId.IronPickaxe]: { name: '铁镐', color: '#e0e0e0', texture: 'iron_pickaxe', placeable: false, solid: false, toolLevel: 3 },
 
@@ -96,11 +96,16 @@ export const TOOL_MULTIPLIER: Record<number, number> = {
     3: 8,
 }
 
-export const GRAVITY_INTERVAL = 180
+export const GRAVITY = 0.00008
+export const MAX_FALL_SPEED = 0.04
+export const JUMP_VELOCITY = -0.018
+export const MAX_JUMP_RISE = 2
 export const MOVE_HUNGER_STEP = 20
 export const MAX_HEALTH = 10
 export const MAX_HUNGER = 10
 export const STARVE_INTERVAL = 3000
 export const HEAL_INTERVAL = 2000
 export const FALL_SAFE_DISTANCE = 3  // 安全下落格数
-export const FURNACE_SMELT_MS = 2000 // 熔炉烧一个物品的时间
+export const TICK_MS = 50
+export const FURNACE_SMELT_TICKS = 200
+export const FURNACE_SMELT_MS = TICK_MS * FURNACE_SMELT_TICKS  // 10000ms
