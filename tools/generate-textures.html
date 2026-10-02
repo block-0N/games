@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MC2D 贴图生成器</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #1a1a1a;
+            color: #eee;
+            padding: 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        p {
+            color: #999;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        button {
+            background: #0067c0;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+
+        button:hover {
+            background: #1a78cc;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        #preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 64px);
+            gap: 10px;
+            margin-top: 24px;
+            padding: 16px;
+            background: #222;
+            border-radius: 10px;
+            min-height: 100px;
+        }
+
+        .preview-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #888;
+        }
+
+        .preview-item canvas {
+            image-rendering: pixelated;
+            border-radius: 4px;
+            background: #333;
+        }
+
+        .status {
+            margin-top: 16px;
+            color: #6ccb5f;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>MC2D 贴图生成器</h1>
+    <p>
+        点击下方按钮，生成所有物品的 PNG 贴图（32×32），打包成 <code>mc2d-textures.zip</code> 下载。<br>
+        解压后放到 <code>public/mc2d/textures/</code> 目录即可。
+    </p>
+
+    <button id="generate">生成并下载 ZIP</button>
+    <button id="preview-btn">仅预览</button>
+    <div class="status" id="status"></div>
+
+    <div id="preview"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>
+        // ============================================
+        // 物品定义
+        // ============================================
+        const ITEMS = [
+            { id: 1, key: 'bedrock', name: '基岩' },
+            { id: 2, key: 'stone', name: '石头' },
+            { id: 3, key: 'cobble', name: '圆石' },
+            { id: 4, key: 'dirt', name: '泥土' },
+            { id: 5, key: 'grass', name: '草方块' },
+            { id: 6, key: 'log', name: '橡木原木' },
+            { id: 7, key: 'leaves', name: '橡树树叶' },
+            { id: 8, key: 'plank', name: '橡木木板' },
+            { id: 9, key: 'coal_ore', name: '煤矿石' },
+            { id: 10, key: 'iron_ore', name: '铁矿石' },
+            { id: 11, key: 'gold_ore', name: '金矿石' },
+            { id: 12, key: 'diamond_ore', name: '钻石矿石' },
+            { id: 13, key: 'crafting_table', name: '工作台' },
+            { id: 14, key: 'furnace', name: '熔炉' },
+            { id: 15, key: 'torch', name: '火把' },
+            { id: 20, key: 'coal', name: '煤炭' },
+            { id: 21, key: 'raw_iron', name: '原铁' },
+            { id: 22, key: 'raw_gold', name: '原金' },
+            { id: 23, key: 'iron_ingot', name: '铁锭' },
+            { id: 24, key: 'gold_ingot', name: '金锭' },
+            { id: 25, key: 'diamond', name: '钻石' },
+            { id: 26, key: 'stick', name: '木棍' },
+            { id: 30, key: 'wood_pickaxe', name: '木镐' },
+            { id: 31, key: 'stone_pickaxe', name: '石镐' },
+            { id: 32, key: 'iron_pickaxe', name: '铁镐' },
+            { id: 40, key: 'apple', name: '苹果' },
+            { id: 41, key: 'bread', name: '面包' },
+        ]
+
+        const SIZE = 32
+        const GRID = 16 // 逻辑 16x16 像素格
+
+        // ============================================
+        // 绘图辅助
+        // ============================================
+        function makeCanvas() {
+            const c = document.createElement('canvas')
+            c.width = SIZE
+            c.height = SIZE
+            return c
+        }
+
+        // 以 16x16 网格为单位画方块
+        function p(ctx, gx, gy, gw, gh, color) {
+            const s = SIZE / GRID
+            ctx.fillStyle = color
+            ctx.fillRect(Math.round(gx * s), Math.round(gy * s), Math.round(gw * s), Math.round(gh * s))
+        }
+
+        // 用种子伪随机保证每次生成的斑点一致
+        function seededRand(seed) {
+            let s = seed
+            return () => {
+                s = (s * 1664525 + 1013904223) & 0xffffffff
+                return ((s >>> 0) / 0xffffffff)
+            }
+        }
+
+        // ============================================
+        // 每个物品的绘制
+        // ============================================
+        const draw = {}
+
+        // ---------- 方块类 ----------
+
+        draw.bedrock = ctx => {
+            p(ctx, 0, 0, 16, 16, '#2a2a2a')
+            const r = seededRand(1)
+            for (let i = 0; i < 40; i++) {
+                const x = Math.floor(r() * 15)
+                const y = Math.floor(r() * 15)
+                p(ctx, x, y, 1, 1, '#1a1a1a')
+            }
+            const r2 = seededRand(7)
+            for (let i = 0; i < 20; i++) {
+                const x = Math.floor(r2() * 15)
+                const y = Math.floor(r2() * 15)
+                p(ctx, x, y, 1, 1, '#3a3a3a')
+            }
+        }
+
+        draw.stone = ctx => {
+            p(ctx, 0, 0, 16, 16, '#7a7a7a')
+            const r = seededRand(2)
+            for (let i = 0; i < 30; i++) {
+                const x = Math.floor(r() * 15)
+                const y = Math.floor(r() * 15)
+                p(ctx, x, y, 1, 1, '#5c5c5c')
+            }
+            const r2 = seededRand(9)
+            for (let i = 0; i < 15; i++) {
+                const x = Math.floor(r2() * 15)
+                const y = Math.floor(r2() * 15)
+                p(ctx, x, y, 1, 1, '#8e8e8e')
+            }
+        }
+
+        draw.cobble = ctx => {
+            p(ctx, 0, 0, 16, 16, '#6a6a6a')
+            // 不规则石块
+            const blocks = [
+                [0, 0, 5, 4], [6, 0, 5, 5], [12, 0, 4, 3],
+                [0, 5, 4, 5], [5, 6, 6, 4], [12, 4, 4, 6],
+                [0, 11, 5, 5], [6, 11, 6, 5], [13, 11, 3, 5],
+            ]
+            const r = seededRand(3)
+            for (const [x, y, w, h] of blocks) {
+                const shade = 0.8 + r() * 0.4
+                const c = Math.round(0x7a * shade).toString(16).padStart(2, '0')
+                p(ctx, x, y, w, h, '#' + c + c + c)
+                p(ctx, x, y, w, 1, '#8e8e8e')
+                p(ctx, x, y + h - 1, w, 1, '#4a4a4a')
+            }
+        }
+
+        draw.dirt = ctx => {
+            p(ctx, 0, 0, 16, 16, '#8b572a')
+            const r = seededRand(4)
+            for (let i = 0; i < 40; i++) {
+                const x = Math.floor(r() * 15)
+                const y = Math.floor(r() * 15)
+                p(ctx, x, y, 1, 1, '#6d4420')
+            }
+            const r2 = seededRand(11)
+            for (let i = 0; i < 25; i++) {
+                const x = Math.floor(r2() * 15)
+                const y = Math.floor(r2() * 15)
+                p(ctx, x, y, 1, 1, '#a06b38')
+            }
+        }
+
+        draw.grass = ctx => {
+            // 上部草
+            p(ctx, 0, 0, 16, 3, '#5ab552')
+            p(ctx, 0, 3, 16, 1, '#4a9e44')
+            // 草尖
+            const r = seededRand(5)
+            for (let x = 0; x < 16; x++) {
+                if (r() > 0.5) p(ctx, x, 3, 1, 1, '#4a9e44')
+            }
+            // 下部泥土
+            p(ctx, 0, 4, 16, 12, '#8b572a')
+            const r2 = seededRand(12)
+            for (let i = 0; i < 30; i++) {
+                const x = Math.floor(r2() * 15)
+                const y = 4 + Math.floor(r2() * 11)
+                p(ctx, x, y, 1, 1, '#6d4420')
+            }
+        }
+
+        draw.log = ctx => {
+            p(ctx, 0, 0, 16, 16, '#6d4c41')
+            // 竖纹
+            for (let x = 1; x < 16; x += 4) {
+                p(ctx, x, 0, 1, 16, '#5a3d30')
+                p(ctx, x + 1, 0, 1, 16, '#7d5c50')
+            }
+            // 边缘明暗
+            p(ctx, 0, 0, 16, 1, '#8a6c5a')
+            p(ctx, 0, 15, 16, 1, '#4a3028')
+        }
+
+        draw.leaves = ctx => {
+            p(ctx, 0, 0, 16, 16, '#2e7d32')
+            const r = seededRand(6)
+            for (let i = 0; i < 60; i++) {
+                const x = Math.floor(r() * 16)
+                const y = Math.floor(r() * 16)
+                p(ctx, x, y, 1, 1, '#1e5c22')
+            }
+            const r2 = seededRand(13)
+            for (let i = 0; i < 40; i++) {
+                const x = Math.floor(r2() * 16)
+                const y = Math.floor(r2() * 16)
+                p(ctx, x, y, 1, 1, '#4caf50')
+            }
+            // 一些透明孔
+            const r3 = seededRand(21)
+            ctx.clearRect
+            for (let i = 0; i < 8; i++) {
+                const x = Math.floor(r3() * 16)
+                const y = Math.floor(r3() * 16)
+                ctx.clearRect(x * 2, y * 2, 2, 2)
+            }
+        }
+
+        draw.plank = ctx => {
+            p(ctx, 0, 0, 16, 16, '#a1887f')
+            // 横向木板分隔
+            p(ctx, 0, 0, 16, 1, '#8a6f66')
+            p(ctx, 0, 4, 16, 1, '#6b544c')
+            p(ctx, 0, 8, 16, 1, '#6b544c')
+            p(ctx, 0, 12, 16, 1, '#6b544c')
+            p(ctx, 0, 15, 16, 1, '#5c473f')
+            // 竖向短纹
+            p(ctx, 3, 1, 1, 3, '#8a6f66')
+            p(ctx, 11, 5, 1, 3, '#8a6f66')
+            p(ctx, 5, 9, 1, 3, '#8a6f66')
+            p(ctx, 13, 13, 1, 2, '#8a6f66')
+        }
+
+        // ---------- 矿石 ----------
+
+        function drawOre(ctx, gemColor, gemDark, seed) {
+            draw.stone(ctx)
+            const r = seededRand(seed)
+            for (let i = 0; i < 5; i++) {
+                const x = 2 + Math.floor(r() * 11)
+                const y = 2 + Math.floor(r() * 11)
+                p(ctx, x, y, 2, 2, gemColor)
+                p(ctx, x, y, 1, 1, '#fff')
+                p(ctx, x + 1, y + 1, 1, 1, gemDark)
+            }
+        }
+
+        draw.coal_ore = ctx => drawOre(ctx, '#1a1a1a', '#000', 100)
+        draw.iron_ore = ctx => drawOre(ctx, '#c9a68a', '#8a6c50', 101)
+        draw.gold_ore = ctx => drawOre(ctx, '#f0d060', '#a08020', 102)
+        draw.diamond_ore = ctx => drawOre(ctx, '#4dd0e1', '#208090', 103)
+
+        // ---------- 工作台、熔炉 ----------
+
+        draw.crafting_table = ctx => {
+            // 顶部木板
+            p(ctx, 0, 0, 16, 4, '#8a6c4a')
+            p(ctx, 0, 0, 16, 1, '#a08060')
+            // 中下部深色
+            p(ctx, 0, 4, 16, 12, '#6b5030')
+            // 工具图案
+            p(ctx, 3, 6, 1, 5, '#4a3020')
+            p(ctx, 2, 6, 3, 1, '#4a3020')
+            p(ctx, 8, 6, 6, 1, '#4a3020')
+            p(ctx, 10, 7, 2, 1, '#4a3020')
+            p(ctx, 4, 10, 6, 1, '#4a3020')
+            // 边框
+            p(ctx, 0, 0, 1, 16, '#5a4030')
+            p(ctx, 15, 0, 1, 16, '#3a2818')
+        }
+
+        draw.furnace = ctx => {
+            p(ctx, 0, 0, 16, 16, '#6b6b6b')
+            const r = seededRand(50)
+            for (let i = 0; i < 30; i++) {
+                const x = Math.floor(r() * 16)
+                const y = Math.floor(r() * 16)
+                p(ctx, x, y, 1, 1, '#555')
+            }
+            // 顶部开口
+            p(ctx, 2, 2, 12, 1, '#4a4a4a')
+            // 炉门
+            p(ctx, 4, 8, 8, 6, '#3a3a3a')
+            p(ctx, 4, 8, 8, 1, '#2a2a2a')
+            // 火光
+            p(ctx, 5, 10, 1, 3, '#ff6600')
+            p(ctx, 6, 9, 1, 4, '#ffaa00')
+            p(ctx, 7, 10, 1, 3, '#ffcc00')
+            p(ctx, 8, 9, 1, 4, '#ffaa00')
+            p(ctx, 9, 10, 1, 3, '#ff6600')
+            p(ctx, 10, 11, 1, 2, '#ff6600')
+        }
+
+        // ---------- 火把 ----------
+
+        draw.torch = ctx => {
+            // 木棍
+            p(ctx, 7, 8, 2, 8, '#6b4c3a')
+            p(ctx, 7, 8, 1, 8, '#8a6c5a')
+            // 火
+            p(ctx, 6, 4, 4, 4, '#ff9800')
+            p(ctx, 7, 3, 2, 1, '#ffcc00')
+            p(ctx, 7, 5, 2, 3, '#ffeb3b')
+            p(ctx, 6, 7, 4, 1, '#ff6600')
+        }
+
+        // ---------- 材料 ----------
+
+        draw.coal = ctx => {
+            // 不规则黑色团块
+            p(ctx, 6, 5, 4, 2, '#1a1a1a')
+            p(ctx, 4, 7, 8, 5, '#1a1a1a')
+            p(ctx, 5, 12, 6, 2, '#1a1a1a')
+            // 反光
+            p(ctx, 6, 7, 1, 1, '#3a3a3a')
+            p(ctx, 8, 9, 2, 1, '#3a3a3a')
+            p(ctx, 9, 6, 1, 1, '#3a3a3a')
+            // 阴影
+            p(ctx, 5, 13, 6, 1, '#000')
+        }
+
+        draw.raw_iron = ctx => {
+            const r = seededRand(200)
+            p(ctx, 4, 5, 8, 8, '#c9a68a')
+            for (let i = 0; i < 15; i++) {
+                const x = 4 + Math.floor(r() * 7)
+                const y = 5 + Math.floor(r() * 7)
+                p(ctx, x, y, 1, 1, '#8a6c50')
+            }
+            for (let i = 0; i < 8; i++) {
+                const x = 4 + Math.floor(r() * 7)
+                const y = 5 + Math.floor(r() * 7)
+                p(ctx, x, y, 1, 1, '#e0c0a0')
+            }
+        }
+
+        draw.raw_gold = ctx => {
+            const r = seededRand(201)
+            p(ctx, 4, 5, 8, 8, '#e0c060')
+            for (let i = 0; i < 15; i++) {
+                const x = 4 + Math.floor(r() * 7)
+                const y = 5 + Math.floor(r() * 7)
+                p(ctx, x, y, 1, 1, '#a08020')
+            }
+            for (let i = 0; i < 8; i++) {
+                const x = 4 + Math.floor(r() * 7)
+                const y = 5 + Math.floor(r() * 7)
+                p(ctx, x, y, 1, 1, '#fff0a0')
+            }
+        }
+
+        draw.iron_ingot = ctx => {
+            // 梯形
+            p(ctx, 4, 8, 8, 4, '#dcdcdc')
+            p(ctx, 5, 7, 6, 1, '#eaeaea')
+            p(ctx, 4, 8, 8, 1, '#f0f0f0')
+            p(ctx, 4, 11, 8, 1, '#9a9a9a')
+            p(ctx, 12, 8, 1, 4, '#a8a8a8')
+            // 高光
+            p(ctx, 6, 8, 4, 1, '#fff')
+        }
+
+        draw.gold_ingot = ctx => {
+            p(ctx, 4, 8, 8, 4, '#f0d060')
+            p(ctx, 5, 7, 6, 1, '#f8e080')
+            p(ctx, 4, 8, 8, 1, '#fff0a0')
+            p(ctx, 4, 11, 8, 1, '#a08020')
+            p(ctx, 12, 8, 1, 4, '#c0a040')
+            p(ctx, 6, 8, 4, 1, '#fff4b0')
+        }
+
+        draw.diamond = ctx => {
+            // 菱形
+            p(ctx, 8, 4, 2, 2, '#6ee0f0')
+            p(ctx, 6, 6, 6, 2, '#4dd0e1')
+            p(ctx, 4, 8, 10, 2, '#4dd0e1')
+            p(ctx, 6, 10, 6, 2, '#3aa8b8')
+            p(ctx, 8, 12, 2, 2, '#2a8898')
+            // 高光
+            p(ctx, 8, 5, 1, 1, '#fff')
+            p(ctx, 7, 7, 1, 1, '#a0f0ff')
+            p(ctx, 10, 8, 1, 1, '#a0f0ff')
+        }
+
+        draw.stick = ctx => {
+            // 竖条
+            p(ctx, 7, 4, 2, 12, '#8a6c4a')
+            p(ctx, 7, 4, 1, 12, '#a08868')
+            p(ctx, 8, 4, 1, 12, '#6a5030')
+            // 顶部斜切
+            p(ctx, 6, 5, 1, 2, '#8a6c4a')
+            p(ctx, 9, 11, 1, 2, '#8a6c4a')
+        }
+
+        // ---------- 工具（镐子） ----------
+
+        function drawPickaxe(ctx, handleColor, handleDark, headColor, headDark, headLight) {
+            // 木柄（斜放）
+            for (let i = 0; i < 8; i++) {
+                p(ctx, 5 + i, 10 - i, 1, 1, handleColor)
+                p(ctx, 6 + i, 10 - i, 1, 1, handleDark)
+            }
+            // 镐头
+            p(ctx, 5, 4, 1, 3, headColor)
+            p(ctx, 6, 3, 3, 1, headColor)
+            p(ctx, 9, 3, 2, 1, headLight)
+            p(ctx, 11, 4, 1, 1, headLight)
+            p(ctx, 11, 5, 1, 2, headColor)
+            p(ctx, 4, 5, 1, 2, headDark)
+            p(ctx, 4, 4, 1, 1, headDark)
+            p(ctx, 5, 3, 1, 1, headDark)
+        }
+
+        draw.wood_pickaxe = ctx => drawPickaxe(ctx, '#a08868', '#6a5030', '#c19a6b', '#8a6c4a', '#e0be8a')
+        draw.stone_pickaxe = ctx => drawPickaxe(ctx, '#a08868', '#6a5030', '#9e9e9e', '#6a6a6a', '#c8c8c8')
+        draw.iron_pickaxe = ctx => drawPickaxe(ctx, '#a08868', '#6a5030', '#e0e0e0', '#a0a0a0', '#fff')
+
+        // ---------- 食物 ----------
+
+        draw.apple = ctx => {
+            // 苹果主体
+            p(ctx, 5, 6, 6, 7, '#e74c3c')
+            p(ctx, 4, 8, 1, 4, '#c0392b')
+            p(ctx, 11, 8, 1, 4, '#c0392b')
+            p(ctx, 5, 5, 6, 1, '#ff6b5b')
+            // 高光
+            p(ctx, 6, 7, 1, 2, '#ffa090')
+            p(ctx, 7, 7, 1, 1, '#ffa090')
+            // 阴影
+            p(ctx, 5, 12, 6, 1, '#a02020')
+            // 叶子
+            p(ctx, 8, 3, 2, 2, '#4caf50')
+            p(ctx, 9, 4, 1, 1, '#2e7d32')
+            // 茎
+            p(ctx, 8, 4, 1, 2, '#5a3d30')
+        }
+
+        draw.bread = ctx => {
+            // 面包主体
+            p(ctx, 3, 7, 10, 6, '#d2a56b')
+            p(ctx, 4, 6, 8, 1, '#e0b880')
+            p(ctx, 3, 12, 10, 1, '#a87840')
+            // 底部阴影
+            p(ctx, 4, 13, 8, 1, '#8a5c30')
+            // 顶部纹路
+            p(ctx, 6, 7, 1, 3, '#a87840')
+            p(ctx, 9, 7, 1, 3, '#a87840')
+            p(ctx, 5, 8, 1, 1, '#a87840')
+            p(ctx, 10, 8, 1, 1, '#a87840')
+            // 高光
+            p(ctx, 4, 7, 2, 1, '#f0d0a0')
+            p(ctx, 10, 7, 2, 1, '#f0d0a0')
+        }
+
+        // ============================================
+        // 绘制
+        // ============================================
+        function renderItem(item) {
+            const canvas = makeCanvas()
+            const ctx = canvas.getContext('2d')
+            ctx.clearRect(0, 0, SIZE, SIZE)
+            const fn = draw[item.key]
+            if (fn) fn(ctx)
+            return canvas
+        }
+
+        // ============================================
+        // 预览
+        // ============================================
+        function renderPreview() {
+            const preview = document.getElementById('preview')
+            preview.innerHTML = ''
+            for (const item of ITEMS) {
+                const canvas = renderItem(item)
+                const wrap = document.createElement('div')
+                wrap.className = 'preview-item'
+                wrap.appendChild(canvas)
+                const label = document.createElement('div')
+                label.textContent = item.name
+                wrap.appendChild(label)
+                preview.appendChild(wrap)
+            }
+        }
+
+        // ============================================
+        // 生成 ZIP
+        // ============================================
+        async function generateZip() {
+            const status = document.getElementById('status')
+            const btn = document.getElementById('generate')
+            btn.disabled = true
+            status.textContent = '生成中...'
+
+            const zip = new JSZip()
+            const folder = zip.folder('mc2d-textures')
+
+            for (const item of ITEMS) {
+                const canvas = renderItem(item)
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+                const arrayBuffer = await blob.arrayBuffer()
+                folder.file(`${item.key}.png`, arrayBuffer)
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' })
+            const url = URL.createObjectURL(content)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'mc2d-textures.zip'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+
+            status.textContent = `✓ 已生成 ${ITEMS.length} 张贴图，下载完成后解压到 public/mc2d/textures/`
+            btn.disabled = false
+        }
+
+        document.getElementById('preview-btn').addEventListener('click', renderPreview)
+        document.getElementById('generate').addEventListener('click', generateZip)
+
+        // 自动预览
+        renderPreview()
+    </script>
+</body>
+
+</html>

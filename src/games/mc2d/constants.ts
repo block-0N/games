@@ -40,6 +40,7 @@ export const enum BlockId {
 export interface ItemDef {
     name: string
     color: string
+    texture?: string
     placeable: boolean
     solid: boolean
     unbreakable?: boolean
@@ -55,36 +56,36 @@ export interface ItemDef {
 
 export const BLOCKS: Record<number, ItemDef> = {
     [BlockId.Air]: { name: '空气', color: 'transparent', placeable: false, solid: false },
-    [BlockId.Bedrock]: { name: '基岩', color: '#2a2a2a', placeable: true, solid: true, unbreakable: true },
-    [BlockId.Stone]: { name: '石头', color: '#6e6e6e', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1200, drops: BlockId.Cobble },
-    [BlockId.Cobble]: { name: '圆石', color: '#5c5c5c', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1200 },
-    [BlockId.Dirt]: { name: '泥土', color: '#8b572a', placeable: true, solid: true, breakTime: 350 },
-    [BlockId.Grass]: { name: '草方块', color: '#4caf50', placeable: true, solid: true, breakTime: 350, drops: BlockId.Dirt },
-    [BlockId.Log]: { name: '橡木原木', color: '#6d4c41', placeable: true, solid: true, breakTime: 700 },
-    [BlockId.Leaves]: { name: '橡树树叶', color: '#2e7d32', placeable: true, solid: true, breakTime: 250, drops: BlockId.Apple, dropChance: 0.12 },
-    [BlockId.Plank]: { name: '橡木木板', color: '#a1887f', placeable: true, solid: true, breakTime: 600, fuel: 1 },
-    [BlockId.CoalOre]: { name: '煤矿石', color: '#4a4a4a', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400, drops: BlockId.Coal },
-    [BlockId.IronOre]: { name: '铁矿石', color: '#a57c5c', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawIron },
-    [BlockId.GoldOre]: { name: '金矿石', color: '#c9a227', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawGold },
-    [BlockId.DiamondOre]: { name: '钻石矿石', color: '#4dd0e1', placeable: true, solid: true, breakMinLevel: 2, breakTime: 2200, drops: BlockId.Diamond },
-    [BlockId.CraftingTable]: { name: '工作台', color: '#8a6c4a', placeable: true, solid: true, breakTime: 700 },
-    [BlockId.Furnace]: { name: '熔炉', color: '#6b6b6b', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400 },
-    [BlockId.Torch]: { name: '火把', color: '#ffb300', placeable: true, solid: false, breakTime: 50, lightRadius: 6 },
+    [BlockId.Bedrock]: { name: '基岩', color: '#2a2a2a', texture: 'bedrock', placeable: true, solid: true, unbreakable: true },
+    [BlockId.Stone]: { name: '石头', color: '#6e6e6e', texture: 'stone', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1200, drops: BlockId.Cobble },
+    [BlockId.Cobble]: { name: '圆石', color: '#5c5c5c', texture: 'cobble', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1200 },
+    [BlockId.Dirt]: { name: '泥土', color: '#8b572a', texture: 'dirt', placeable: true, solid: true, breakTime: 350 },
+    [BlockId.Grass]: { name: '草方块', color: '#4caf50', texture: 'grass', placeable: true, solid: true, breakTime: 350, drops: BlockId.Dirt },
+    [BlockId.Log]: { name: '橡木原木', color: '#6d4c41', texture: 'log', placeable: true, solid: true, breakTime: 700 },
+    [BlockId.Leaves]: { name: '橡树树叶', color: '#2e7d32', texture: 'leaves', placeable: true, solid: true, breakTime: 250, drops: BlockId.Apple, dropChance: 0.12 },
+    [BlockId.Plank]: { name: '橡木木板', color: '#a1887f', texture: 'plank', placeable: true, solid: true, breakTime: 600, fuel: 1 },
+    [BlockId.CoalOre]: { name: '煤矿石', color: '#4a4a4a', texture: 'coal_ore', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400, drops: BlockId.Coal },
+    [BlockId.IronOre]: { name: '铁矿石', color: '#a57c5c', texture: 'iron_ore', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawIron },
+    [BlockId.GoldOre]: { name: '金矿石', color: '#c9a227', texture: 'gold_ore', placeable: true, solid: true, breakMinLevel: 2, breakTime: 1800, drops: BlockId.RawGold },
+    [BlockId.DiamondOre]: { name: '钻石矿石', color: '#4dd0e1', texture: 'diamond_ore', placeable: true, solid: true, breakMinLevel: 2, breakTime: 2200, drops: BlockId.Diamond },
+    [BlockId.CraftingTable]: { name: '工作台', color: '#8a6c4a', texture: 'crafting_table', placeable: true, solid: true, breakTime: 700 },
+    [BlockId.Furnace]: { name: '熔炉', color: '#6b6b6b', texture: 'furnace', placeable: true, solid: true, breakMinLevel: 1, breakTime: 1400 },
+    [BlockId.Torch]: { name: '火把', color: '#ffb300', texture: 'torch', placeable: true, solid: false, breakTime: 50, lightRadius: 6 },
 
-    [BlockId.Coal]: { name: '煤炭', color: '#1a1a1a', placeable: false, solid: false, fuel: 8 },
-    [BlockId.RawIron]: { name: '原铁', color: '#c9a68a', placeable: false, solid: false },
-    [BlockId.RawGold]: { name: '原金', color: '#e0c060', placeable: false, solid: false },
-    [BlockId.IronIngot]: { name: '铁锭', color: '#cfcfcf', placeable: false, solid: false },
-    [BlockId.GoldIngot]: { name: '金锭', color: '#f0d060', placeable: false, solid: false },
-    [BlockId.Diamond]: { name: '钻石', color: '#4dd0e1', placeable: false, solid: false },
-    [BlockId.Stick]: { name: '木棍', color: '#8a6c4a', placeable: false, solid: false, fuel: 1 },
+    [BlockId.Coal]: { name: '煤炭', color: '#1a1a1a', texture: 'coal', placeable: false, solid: false, fuel: 8 },
+    [BlockId.RawIron]: { name: '原铁', color: '#c9a68a', texture: 'raw_iron', placeable: false, solid: false },
+    [BlockId.RawGold]: { name: '原金', color: '#e0c060', texture: 'raw_gold', placeable: false, solid: false },
+    [BlockId.IronIngot]: { name: '铁锭', color: '#cfcfcf', texture: 'iron_ingot', placeable: false, solid: false },
+    [BlockId.GoldIngot]: { name: '金锭', color: '#f0d060', texture: 'gold_ingot', placeable: false, solid: false },
+    [BlockId.Diamond]: { name: '钻石', color: '#4dd0e1', texture: 'diamond', placeable: false, solid: false },
+    [BlockId.Stick]: { name: '木棍', color: '#8a6c4a', texture: 'stick', placeable: false, solid: false, fuel: 1 },
 
-    [BlockId.WoodPickaxe]: { name: '木镐', color: '#c19a6b', placeable: false, solid: false, toolLevel: 1, fuel: 1 },
-    [BlockId.StonePickaxe]: { name: '石镐', color: '#9e9e9e', placeable: false, solid: false, toolLevel: 2 },
-    [BlockId.IronPickaxe]: { name: '铁镐', color: '#e0e0e0', placeable: false, solid: false, toolLevel: 3 },
+    [BlockId.WoodPickaxe]: { name: '木镐', color: '#c19a6b', texture: 'wood_pickaxe', placeable: false, solid: false, toolLevel: 1, fuel: 1 },
+    [BlockId.StonePickaxe]: { name: '石镐', color: '#9e9e9e', texture: 'stone_pickaxe', placeable: false, solid: false, toolLevel: 2 },
+    [BlockId.IronPickaxe]: { name: '铁镐', color: '#e0e0e0', texture: 'iron_pickaxe', placeable: false, solid: false, toolLevel: 3 },
 
-    [BlockId.Apple]: { name: '苹果', color: '#e74c3c', placeable: false, solid: false, food: 4 },
-    [BlockId.Bread]: { name: '面包', color: '#d2a56b', placeable: false, solid: false, food: 6 },
+    [BlockId.Apple]: { name: '苹果', color: '#e74c3c', texture: 'apple', placeable: false, solid: false, food: 4 },
+    [BlockId.Bread]: { name: '面包', color: '#d2a56b', texture: 'bread', placeable: false, solid: false, food: 6 },
 }
 
 // 挖掘工具倍率：工具等级 → 速度倍率

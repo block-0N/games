@@ -2,6 +2,7 @@ import '../../styles/theme.css'
 import './style.css'
 import { World } from './world'
 import { Renderer } from './renderer'
+import { loadAllTextures, getTextureUrl } from './textures'
 import {
     BlockId,
     BLOCKS,
@@ -144,7 +145,10 @@ class MC2D {
         this.cacheElements()
         this.buildBackpackGridDom()
         this.buildCraftGridDom()
-        this.init()
+
+        loadAllTextures().then(() => {
+            this.init()
+        })
     }
 
     private createSlots(n: number): Stack[] {
@@ -697,11 +701,23 @@ class MC2D {
     private updateSlotEl(el: HTMLElement, slot: Stack): void {
         const iconEl = el.querySelector<HTMLElement>('.mc2d-slot__icon')!
         const countEl = el.querySelector<HTMLElement>('.mc2d-slot__count')!
+
         if (slot.id !== null && slot.count > 0) {
-            iconEl.style.background = BLOCKS[slot.id].color
+            const url = getTextureUrl(slot.id)
+            if (url) {
+                iconEl.style.backgroundImage = `url("${url}")`
+                iconEl.style.backgroundSize = 'contain'
+                iconEl.style.backgroundRepeat = 'no-repeat'
+                iconEl.style.backgroundPosition = 'center'
+                iconEl.style.backgroundColor = 'transparent'
+            } else {
+                iconEl.style.backgroundImage = 'none'
+                iconEl.style.backgroundColor = BLOCKS[slot.id].color
+            }
             countEl.textContent = String(slot.count)
         } else {
-            iconEl.style.background = 'transparent'
+            iconEl.style.backgroundImage = 'none'
+            iconEl.style.backgroundColor = 'transparent'
             countEl.textContent = ''
         }
     }
@@ -709,7 +725,17 @@ class MC2D {
     private renderHeld(): void {
         if (this.heldStack.id !== null && this.heldStack.count > 0) {
             this.heldEl.classList.add('is-visible')
-            this.heldIconEl.style.background = BLOCKS[this.heldStack.id].color
+            const url = getTextureUrl(this.heldStack.id)
+            if (url) {
+                this.heldIconEl.style.backgroundImage = `url("${url}")`
+                this.heldIconEl.style.backgroundSize = 'contain'
+                this.heldIconEl.style.backgroundRepeat = 'no-repeat'
+                this.heldIconEl.style.backgroundPosition = 'center'
+                this.heldIconEl.style.backgroundColor = 'transparent'
+            } else {
+                this.heldIconEl.style.backgroundImage = 'none'
+                this.heldIconEl.style.backgroundColor = BLOCKS[this.heldStack.id].color
+            }
             this.heldCountEl.textContent = String(this.heldStack.count)
             this.heldEl.style.left = `${this.mouseX}px`
             this.heldEl.style.top = `${this.mouseY}px`

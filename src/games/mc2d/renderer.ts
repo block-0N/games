@@ -1,5 +1,6 @@
 import { BLOCKS, BlockId } from './constants'
 import type { World } from './world'
+import { getTexture } from './textures'
 
 export interface Camera {
     x: number
@@ -54,36 +55,28 @@ export class Renderer {
         if (!def) return
 
         const ctx = this.ctx
+        const img = getTexture(block)
 
-        // 火把特殊绘制
-        if (block === BlockId.Torch) {
-            ctx.fillStyle = '#3a2a1a'
-            ctx.fillRect(x + size * 0.42, y + size * 0.4, size * 0.16, size * 0.55)
-            ctx.fillStyle = '#ffeb3b'
-            ctx.beginPath()
-            ctx.arc(x + size * 0.5, y + size * 0.35, size * 0.18, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.fillStyle = '#ff9800'
-            ctx.beginPath()
-            ctx.arc(x + size * 0.5, y + size * 0.35, size * 0.1, 0, Math.PI * 2)
-            ctx.fill()
-            return
+        if (img) {
+            ctx.drawImage(img, x, y, size, size)
+        } else {
+            // 兜底：色块
+            ctx.fillStyle = def.color
+            ctx.fillRect(x, y, size, size)
+            ctx.fillStyle = 'rgba(255,255,255,0.18)'
+            ctx.fillRect(x, y, size, Math.max(1, size * 0.1))
+            ctx.fillStyle = 'rgba(0,0,0,0.18)'
+            ctx.fillRect(x + size - Math.max(1, size * 0.08), y, Math.max(1, size * 0.08), size)
         }
 
-        ctx.fillStyle = def.color
-        ctx.fillRect(x, y, size, size)
+        // 火把额外发光
+        if (block === BlockId.Torch && img) {
+            // 已由光照层处理，这里不再叠加
+        }
 
-        ctx.fillStyle = 'rgba(255,255,255,0.18)'
-        ctx.fillRect(x, y, size, Math.max(1, size * 0.1))
-
-        ctx.fillStyle = 'rgba(0,0,0,0.18)'
-        ctx.fillRect(x + size - Math.max(1, size * 0.08), y, Math.max(1, size * 0.08), size)
-
-        ctx.fillStyle = 'rgba(0,0,0,0.12)'
-        ctx.fillRect(x, y + size - Math.max(1, size * 0.08), size, Math.max(1, size * 0.08))
-
+        // 网格线
         if (size >= 16) {
-            ctx.strokeStyle = 'rgba(0,0,0,0.15)'
+            ctx.strokeStyle = 'rgba(0,0,0,0.12)'
             ctx.lineWidth = 1
             ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1)
         }

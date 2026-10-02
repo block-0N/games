@@ -731,3 +731,17 @@ body {
         gap: 12px;
     }
 }
+
+/* ============================================
+   贴图
+   ============================================ */
+
+.mc2d-slot__icon,
+.mc2d-held__icon {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    transition: background-image 0.1s;
+}
